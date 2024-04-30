@@ -48,8 +48,20 @@ public class Chunk : MonoBehaviour
     private Transform NoCollisionObjTransparent;
     private Coroutine LightingCoroutine;
     private bool LightingGenerating;
+    private int currentSunLevel;
     void Start()
     {
+        currentSunLevel = ChunkManager.Instance.SkyIntensity;
+        InvokeRepeating("Tick", 0, 1);
+    }
+
+    void Tick()
+    {
+        if(ChunkManager.Instance.SkyIntensity != currentSunLevel)
+        {
+            currentSunLevel = ChunkManager.Instance.SkyIntensity;
+            GenerateLighting(true, false);
+        }
     }
 
     public void Init(Material mat,Material transparentMat, byte[] transparent, byte[] nocollision, int _ChunkSize, float _TextureSize, float _BlockSize, Vector3Int Position)
@@ -270,7 +282,7 @@ public class Chunk : MonoBehaviour
         Lighting.Add(new Color(lightLevelR, lightLevelG, lightLevelB));
     }
 
-    public async void GenerateLighting()
+    public async void GenerateLighting(bool generateSun, bool generatePoint)
     {
 
         if (LightingGenerating || GetMax(VoxelData) == 0) return;
@@ -293,7 +305,7 @@ public class Chunk : MonoBehaviour
         };
 
 
-        await CalculateChunkLighting(this);
+        await CalculateChunkLighting(this, generateSun, generatePoint);
         await Task.Run(async () =>
         {
             for (int x = 0; x < ChunkSize; x++)
@@ -390,47 +402,48 @@ public class Chunk : MonoBehaviour
 
 
 
-    private async Task<(byte[,,] R, byte[,,] G, byte[,,] B)> CalculateChunkLighting(Chunk chunk)
+    private async Task<(byte[,,] R, byte[,,] G, byte[,,] B)> CalculateChunkLighting(Chunk chunk, bool generateSun, bool generatePoint)
     {
-
-        chunk.LightDataSun = new byte[ChunkSize, ChunkSize, ChunkSize];
-        chunk.LightDataR = new byte[ChunkSize, ChunkSize, ChunkSize];
-        chunk.LightDataG = new byte[ChunkSize, ChunkSize, ChunkSize];
-        chunk.LightDataB = new byte[ChunkSize, ChunkSize, ChunkSize];
-
-
-        Chunk AboveChunk = ChunkManager.Instance.GetNeighboringChunk(chunk.currentPos, 0, 1, 0);
-        Chunk[] NeighborChunks = GetNeighboringChunks();
-
-        SunLighting(AboveChunk, chunk);
-
-
-        //CurrentChunkPass
-        for (int x = 0; x < ChunkSize; x++)
+        if (generateSun)
         {
-            for (int y = 0; y < ChunkSize; y++)
-            {
-                for (int z = 0; z < ChunkSize; z++)
-                {
-                    if (VoxelData[x, y, z] == 10)
-                    {
-                        AddLightWithRadius(chunk, (15, 15, 15), x, y, z, 5, 1, true);
-                    }
-                    for(int i = 0; i < NeighborChunks.Length; i++)
-                    {
-                        Chunk neighborChunk = NeighborChunks[i];
-                        if (neighborChunk)
-                        {
-                            Vector3Int offset = new Vector3Int(neighborChunk.currentPos.x - chunk.currentPos.x,
-                                                 neighborChunk.currentPos.y - chunk.currentPos.y,
-                                                 neighborChunk.currentPos.z - chunk.currentPos.z);
-                            if (neighborChunk.GetData()[x, y, z] == 10)
-                            {
-                                int currentX = x + offset.x * ChunkSize;
-                                int currentY = y + offset.y * ChunkSize;
-                                int currentZ = z + offset.z * ChunkSize;
+            chunk.LightDataSun = new byte[ChunkSize, ChunkSize, ChunkSize];
+            Chunk AboveChunk = ChunkManager.Instance.GetNeighboringChunk(chunk.currentPos, 0, 1, 0);
+            SunLighting(AboveChunk, chunk);
+        }
 
-                                AddLightWithRadius(chunk, (15, 15, 15), currentX, currentY, currentZ, 5, 1, true);
+        if (generatePoint)
+        {
+            chunk.LightDataR = new byte[ChunkSize, ChunkSize, ChunkSize];
+            chunk.LightDataG = new byte[ChunkSize, ChunkSize, ChunkSize];
+            chunk.LightDataB = new byte[ChunkSize, ChunkSize, ChunkSize];
+            Chunk[] NeighborChunks = GetNeighboringChunks(true);
+            //CurrentChunkPass
+            for (int x = 0; x < ChunkSize; x++)
+            {
+                for (int y = 0; y < ChunkSize; y++)
+                {
+                    for (int z = 0; z < ChunkSize; z++)
+                    {
+                        if (VoxelData[x, y, z] == 10)
+                        {
+                            AddLightWithRadius(chunk, (15, 15, 15), x, y, z, 15, .1f, true);
+                        }
+                        for (int i = 0; i < NeighborChunks.Length; i++)
+                        {
+                            Chunk neighborChunk = NeighborChunks[i];
+                            if (neighborChunk)
+                            {
+                                Vector3Int offset = new Vector3Int(neighborChunk.currentPos.x - chunk.currentPos.x,
+                                                     neighborChunk.currentPos.y - chunk.currentPos.y,
+                                                     neighborChunk.currentPos.z - chunk.currentPos.z);
+                                if (neighborChunk.GetData()[x, y, z] == 10)
+                                {
+                                    int currentX = x + offset.x * ChunkSize;
+                                    int currentY = y + offset.y * ChunkSize;
+                                    int currentZ = z + offset.z * ChunkSize;
+
+                                    AddLightWithRadius(chunk, (15, 15, 15), currentX, currentY, currentZ, 15, .1f, true);
+                                }
                             }
                         }
                     }
@@ -438,7 +451,7 @@ public class Chunk : MonoBehaviour
             }
         }
 
-     
+
 
 
         await Task.CompletedTask;
@@ -872,8 +885,9 @@ public class Chunk : MonoBehaviour
         if (updateNeighbors)
         {
             UpdateNeighborChunks();
+            UpdateNeighborChunksLighting();
         }
-        GenerateLighting();
+        GenerateLighting(true, true);
 
         isGeneratingMesh = false;
     }
@@ -979,7 +993,7 @@ public class Chunk : MonoBehaviour
         return false; 
     }
 
-    private Chunk[] GetNeighboringChunks()
+    private Chunk[] GetNeighboringChunks(bool useDiagonal)
     {
         List<Chunk> neighboringChunks = new List<Chunk>();
 
@@ -992,6 +1006,29 @@ public class Chunk : MonoBehaviour
         new Vector3Int(0, 0, -1),
         new Vector3Int(0, 0, 1),
     };
+
+        // If useDiagonal is true, include diagonal directions
+        if (useDiagonal)
+        {
+            Vector3Int[] diagonalDirections =
+            {
+            new Vector3Int(1, 1, 0),
+            new Vector3Int(1, -1, 0),
+            new Vector3Int(-1, 1, 0),
+            new Vector3Int(-1, -1, 0),
+            new Vector3Int(1, 0, 1),
+            new Vector3Int(1, 0, -1),
+            new Vector3Int(-1, 0, 1),
+            new Vector3Int(-1, 0, -1),
+            new Vector3Int(0, 1, 1),
+            new Vector3Int(0, 1, -1),
+            new Vector3Int(0, -1, 1),
+            new Vector3Int(0, -1, -1),
+        };
+
+            // Combine the regular and diagonal directions
+            directions = directions.Concat(diagonalDirections).ToArray();
+        }
 
         ChunkManager chunkManager = ChunkManager.Instance;
 
@@ -1009,9 +1046,10 @@ public class Chunk : MonoBehaviour
 
 
 
+
     public void UpdateNeighborChunks()
     {
-        Chunk[] chunks = GetNeighboringChunks();
+        Chunk[] chunks = GetNeighboringChunks(false);
         for (int i = 0; i < chunks.Length; i++) 
         {
             chunks[i].GenerateMesh(false);
@@ -1019,7 +1057,14 @@ public class Chunk : MonoBehaviour
     }
 
 
-
+    public void UpdateNeighborChunksLighting()
+    {
+        Chunk[] chunks = GetNeighboringChunks(true);
+        for (int i = 0; i < chunks.Length; i++)
+        {
+            chunks[i].GenerateLighting(true, true);
+        }
+    }
     private void AddQuad(List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, Vector3 bottomLeft, Vector3 bottomRight, Vector3 topLeft, Vector3 topRight, int blockId, bool inverted = false)
     {
         int vertIndex = vertices.Count;

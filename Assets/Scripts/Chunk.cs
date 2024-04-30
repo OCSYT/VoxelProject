@@ -52,7 +52,7 @@ public class Chunk : MonoBehaviour
     void Start()
     {
         currentSunLevel = ChunkManager.Instance.SkyIntensity;
-        InvokeRepeating("Tick", 0, 1);
+        InvokeRepeating("Tick", 0, .1f);
     }
 
     void Tick()
@@ -296,6 +296,10 @@ public class Chunk : MonoBehaviour
                                 {
                                     AddLight(voxelPos, Lighting);
                                 }
+                                else if (isTransparentNoCollision)
+                                {
+                                    AddLight(voxelPos, LightingNoCollisionTransparent);
+                                }
                                 else if (isTransparent)
                                 {
                                     AddLight(voxelPos, LightingTransparent);
@@ -303,10 +307,6 @@ public class Chunk : MonoBehaviour
                                 else if (hasNoCollision)
                                 {
                                     AddLight(voxelPos, LightingNoCollision);
-                                }
-                                else if (isTransparentNoCollision)
-                                {
-                                    AddLight(voxelPos, LightingNoCollisionTransparent);
                                 }
                             }
                         }
@@ -342,7 +342,8 @@ public class Chunk : MonoBehaviour
 
         if (NoCollisionObjTransparent && noCollisionTransparentColors.Length == _MeshNoCollisionTransparent.vertices.Length && noCollisionTransparentColors.Length != 0 && _MeshNoCollisionTransparent.vertices.Length != 0)
         {
-            _MeshNoCollisionTransparent.colors = (noCollisionColors);
+            _MeshNoCollisionTransparent.colors = (noCollisionTransparentColors);
+
         }
 
         LightingGenerating = false;
@@ -720,6 +721,7 @@ public class Chunk : MonoBehaviour
             _Mesh.vertices = vertices.ToArray();
             _Mesh.triangles = triangles.ToArray();
             _Mesh.uv = uvs.ToArray();
+            _Mesh.RecalculateNormals();
             _Mesh.colors = null;
 
             if (_Mesh.triangles.Length > 0)
@@ -754,6 +756,7 @@ public class Chunk : MonoBehaviour
             _MeshTransparent.vertices = verticesTransparent.ToArray();
             _MeshTransparent.triangles = trianglesTransparent.ToArray();
             _MeshTransparent.uv = uvsTransparent.ToArray();
+            _MeshTransparent.RecalculateNormals();
             _MeshTransparent.colors = null;
 
             if (_MeshTransparent.triangles.Length > 0)
@@ -784,6 +787,7 @@ public class Chunk : MonoBehaviour
             _MeshNoCollision.vertices = verticesNoCollision.ToArray();
             _MeshNoCollision.triangles = trianglesNoCollision.ToArray();
             _MeshNoCollision.uv = uvsNoCollision.ToArray();
+            _MeshNoCollision.RecalculateNormals();
             _MeshNoCollision.colors = null;
 
             if (_MeshNoCollision.triangles.Length > 0)
@@ -814,6 +818,7 @@ public class Chunk : MonoBehaviour
             _MeshNoCollisionTransparent.vertices = verticesNoCollisionTransparent.ToArray();
             _MeshNoCollisionTransparent.triangles = trianglesNoCollisionTransparent.ToArray();
             _MeshNoCollisionTransparent.uv = uvsNoCollisionTransparent.ToArray();
+            _MeshNoCollisionTransparent.RecalculateNormals();
             _MeshNoCollisionTransparent.colors = null;
 
             if (_MeshNoCollisionTransparent.triangles.Length > 0)
@@ -894,7 +899,16 @@ public class Chunk : MonoBehaviour
             }
             else
             {
-                if (NeighbourBlockID == 0 && !NeighborisTransparent)
+
+                bool isNeighborTransparentBlockSameType = false;
+                if(NeighbourBlockID == VoxelData[x, y, z])
+                {
+                    isNeighborTransparentBlockSameType = true;
+                }
+
+
+
+                if ((!isNeighborTransparentBlockSameType && NeighborisTransparent) || NeighbourBlockID == 0)
                 {
                     return true;
                 }

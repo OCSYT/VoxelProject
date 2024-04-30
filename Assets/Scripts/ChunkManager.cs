@@ -1,11 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Unity.VisualScripting;
 using UnityEngine;
 
 public class ChunkManager : MonoBehaviour
 {
+    public int seed = System.Guid.NewGuid().GetHashCode();
     public GameObject ChunkBorderPrefab;
     public bool ChunkBorders;
     public int renderDistance = 5;
@@ -18,6 +20,9 @@ public class ChunkManager : MonoBehaviour
     public List<byte> NoCollisonBlocks;
     public List<byte> TransparentBlocks;
     public int SkyIntensity = 15;
+    public float Daylength = 1;
+    public float GameTime = 0;
+    public Material SkyShader;
     public static ChunkManager Instance { get; private set; }
     public Dictionary<Vector3Int, Chunk> activeChunks = new Dictionary<Vector3Int, Chunk>();
     public Dictionary<Vector3Int, GameObject> activeChunksObj = new Dictionary<Vector3Int, GameObject>();
@@ -35,8 +40,24 @@ public class ChunkManager : MonoBehaviour
         generateChunksCoroutine = StartCoroutine(GenerateChunks());
     }
 
+    private void OnDestroy()
+    {
+        if (SkyShader)
+        {
+            SkyShader.SetFloat("_Sky", 1);
+        }
+    }
+
     void Update()
     {
+        GameTime += Time.deltaTime;
+        float SkyValue = 15 - (Mathf.Sin(GameTime * Daylength/500) * 15);
+        SkyIntensity = Mathf.RoundToInt(SkyValue);
+        if (SkyShader)
+        {
+            SkyShader.SetFloat("_Sky", SkyValue / 15);
+        }
+
         if (Instance == null)
         {
             Instance = this;
@@ -130,6 +151,9 @@ public class ChunkManager : MonoBehaviour
 
     byte[,,] SetTerrain(Chunk chunk)
     {
+        System.Random random = new System.Random(seed + (int)chunk.transform.position.x
+            + (int)chunk.transform.position.y + (int)chunk.transform.position.z);
+
         byte[,,] VoxelData = new byte[ChunkSize, ChunkSize, ChunkSize];
         Vector3 chunkCornerWorldPos = chunk.transform.position;
 
@@ -146,7 +170,7 @@ public class ChunkManager : MonoBehaviour
                     float waterLevel = 10;
                     float height = 25;
                     float scale = 0.01f; 
-                    float perlinValue = Mathf.PerlinNoise(voxelPosition.x * scale, voxelPosition.z * scale) * height;
+                    float perlinValue = Mathf.PerlinNoise((voxelPosition.x + (seed/1000)) * scale, (voxelPosition.z + (seed / 1000)) * scale) * height;
 
                     int ycoord = (byte)(Mathf.RoundToInt(perlinValue));
 
@@ -201,9 +225,10 @@ public class ChunkManager : MonoBehaviour
                 {
                     if (VoxelData[x, y, z] == 1) // check for grass
                     {
+
                         if (y + 10 < ChunkSize && x + 2 < ChunkSize && z + 2 < ChunkSize
                             && x - 2 > 0 && z - 2 > 0 
-                            && Random.value > 0.95)
+                            && random.NextDouble() > .975f && !HasWoodNeighbor(VoxelData, x, y, z, 3))
                         {
                             for (int i = y + 1; i < y + 4; i++)
                             {
@@ -228,6 +253,37 @@ public class ChunkManager : MonoBehaviour
         }
 
         return VoxelData;
+    }
+
+
+    bool HasWoodNeighbor(byte[,,] voxelData, int x, int y, int z, int radius)
+    {
+        // Check neighboring blocks within a 3x3x3 cube
+        for (int offsetX = -radius; offsetX <= radius; offsetX++)
+        {
+            for (int offsetY = -radius; offsetY <= radius; offsetY++)
+            {
+                for (int offsetZ = -radius; offsetZ <= radius; offsetZ++)
+                {
+                    int neighborX = x + offsetX;
+                    int neighborY = y + offsetY;
+                    int neighborZ = z + offsetZ;
+
+                    // Ensure neighbor is within bounds
+                    if (neighborX >= 0 && neighborX < ChunkSize &&
+                        neighborY >= 0 && neighborY < ChunkSize &&
+                        neighborZ >= 0 && neighborZ < ChunkSize)
+                    {
+                        // Check if the neighbor is a wood block
+                        if (voxelData[neighborX, neighborY, neighborZ] == 7) // Assuming 7 is the ID for wood blocks
+                        {
+                            return true; // Found a wood neighbor
+                        }
+                    }
+                }
+            }
+        }
+        return false; // No wood neighbors found
     }
 
     public static float Perlin3D(float x, float y, float z, float scale)

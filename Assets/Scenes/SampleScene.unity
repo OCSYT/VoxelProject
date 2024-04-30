@@ -382,7 +382,7 @@ MonoBehaviour:
   transparent: {fileID: 2100000, guid: 438ebe16d49699246a667c1f3d8b599d, type: 2}
   NoCollisonBlocks: 0f10
   TransparentBlocks: 080910
-  SkyIntensity: 5
+  SkyIntensity: 15
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0

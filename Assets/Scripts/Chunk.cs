@@ -201,51 +201,6 @@ public class Chunk : MonoBehaviour
     }
 
 
-    private double GetAverage(byte[,,] array)
-    {
-        int totalSum = 0;
-        int totalCount = 0;
-
-        for (int i = 0; i < array.GetLength(0); i++)
-        {
-            for (int j = 0; j < array.GetLength(1); j++)
-            {
-                for (int k = 0; k < array.GetLength(2); k++)
-                {
-                    totalSum += array[i, j, k];
-                    totalCount++;
-                }
-            }
-        }
-
-        if (totalCount == 0)
-        {
-            // Handle division by zero
-            return 0;
-        }
-
-        return (double)totalSum / totalCount;
-    }
-    private byte GetMin(byte[,,] array)
-    {
-        byte min = byte.MaxValue;
-
-        for (int i = 0; i < array.GetLength(0); i++)
-        {
-            for (int j = 0; j < array.GetLength(1); j++)
-            {
-                for (int k = 0; k < array.GetLength(2); k++)
-                {
-                    if (array[i, j, k] < min)
-                    {
-                        min = array[i, j, k];
-                    }
-                }
-            }
-        }
-
-        return min;
-    }
     private byte GetMax(byte[,,] array)
     {
         byte max = byte.MinValue;

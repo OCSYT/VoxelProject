@@ -113,7 +113,7 @@ public class Chunk : MonoBehaviour
         NoCollisionObjTransparent.transform.localPosition = Vector3.zero;
         _MeshFilterNoCollisionTransparent = NoCollisionObjTransparent.transform.AddComponent<MeshFilter>();
         _MeshRendererNoCollisionTransparent = NoCollisionObjTransparent.transform.AddComponent<MeshRenderer>();
-        _MeshRendererNoCollisionTransparent.sharedMaterial = mat;
+        _MeshRendererNoCollisionTransparent.sharedMaterial = transparentMat;
         _MeshNoCollisionTransparent = new Mesh();
         _MeshFilterNoCollisionTransparent.mesh = _MeshNoCollisionTransparent;
 
@@ -821,7 +821,7 @@ public class Chunk : MonoBehaviour
                 if (!_MeshColliderNoCollisionTransparent)
                 {
                     _MeshColliderNoCollisionTransparent = NoCollisionObjTransparent.AddComponent<MeshCollider>();
-                    _MeshColliderNoCollisionTransparent.sharedMesh = _MeshNoCollisionTransparent;;
+                    _MeshColliderNoCollisionTransparent.sharedMesh = _MeshNoCollisionTransparent;
                 }
                 else
                 {

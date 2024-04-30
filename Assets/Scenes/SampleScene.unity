@@ -372,7 +372,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ChunkBorderPrefab: {fileID: 6104295362550119401, guid: b2a1684a706b6a845ade531b06670eda,
     type: 3}
-  ChunkBorders: 1
+  ChunkBorders: 0
   renderDistance: 8
   target: {fileID: 156053372}
   ChunkSize: 16
@@ -382,7 +382,7 @@ MonoBehaviour:
   transparent: {fileID: 2100000, guid: 438ebe16d49699246a667c1f3d8b599d, type: 2}
   NoCollisonBlocks: 0f10
   TransparentBlocks: 080910
-  SkyIntensity: 1
+  SkyIntensity: 5
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0

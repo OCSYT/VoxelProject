@@ -884,10 +884,11 @@ public class Chunk : MonoBehaviour
 
         if (updateNeighbors)
         {
+            GenerateLighting(false, true);
             UpdateNeighborChunks();
             UpdateNeighborChunksLighting();
         }
-        GenerateLighting(true, true);
+        GenerateLighting(true, false);
 
         isGeneratingMesh = false;
     }

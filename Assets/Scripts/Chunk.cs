@@ -408,6 +408,7 @@ public class Chunk : MonoBehaviour
         {
             chunk.LightDataSun = new byte[ChunkSize, ChunkSize, ChunkSize];
             Chunk AboveChunk = ChunkManager.Instance.GetNeighboringChunk(chunk.currentPos, 0, 1, 0);
+
             SunLighting(AboveChunk, chunk);
         }
 
@@ -416,7 +417,8 @@ public class Chunk : MonoBehaviour
             chunk.LightDataR = new byte[ChunkSize, ChunkSize, ChunkSize];
             chunk.LightDataG = new byte[ChunkSize, ChunkSize, ChunkSize];
             chunk.LightDataB = new byte[ChunkSize, ChunkSize, ChunkSize];
-            Chunk[] NeighborChunks = GetNeighboringChunks(true);
+            Chunk[] NeighborChunks = GetNeighboringChunks(true).Item1;
+
             //CurrentChunkPass
             for (int x = 0; x < ChunkSize; x++)
             {
@@ -884,11 +886,9 @@ public class Chunk : MonoBehaviour
 
         if (updateNeighbors)
         {
-            GenerateLighting(false, true);
             UpdateNeighborChunks();
-            UpdateNeighborChunksLighting();
         }
-        GenerateLighting(true, false);
+        GenerateLighting(true, true);
 
         isGeneratingMesh = false;
     }
@@ -994,9 +994,10 @@ public class Chunk : MonoBehaviour
         return false; 
     }
 
-    private Chunk[] GetNeighboringChunks(bool useDiagonal)
+    private (Chunk[], bool[]) GetNeighboringChunks(bool useDiagonal)
     {
         List<Chunk> neighboringChunks = new List<Chunk>();
+        List<bool> IsDiagonal = new List<bool>();
 
         Vector3Int[] directions =
         {
@@ -1008,11 +1009,8 @@ public class Chunk : MonoBehaviour
         new Vector3Int(0, 0, 1),
     };
 
-        // If useDiagonal is true, include diagonal directions
-        if (useDiagonal)
+        Vector3Int[] diagonalDirections =
         {
-            Vector3Int[] diagonalDirections =
-            {
             new Vector3Int(1, 1, 0),
             new Vector3Int(1, -1, 0),
             new Vector3Int(-1, 1, 0),
@@ -1026,6 +1024,8 @@ public class Chunk : MonoBehaviour
             new Vector3Int(0, -1, 1),
             new Vector3Int(0, -1, -1),
         };
+        if (useDiagonal)
+        {
 
             // Combine the regular and diagonal directions
             directions = directions.Concat(diagonalDirections).ToArray();
@@ -1035,6 +1035,9 @@ public class Chunk : MonoBehaviour
 
         foreach (Vector3Int direction in directions)
         {
+
+            IsDiagonal.Add(diagonalDirections.Contains(direction));
+
             Chunk neighboringChunk = chunkManager.GetNeighboringChunk(currentPos, direction.x, direction.y, direction.z);
             if (neighboringChunk != null)
             {
@@ -1042,7 +1045,7 @@ public class Chunk : MonoBehaviour
             }
         }
 
-        return neighboringChunks.ToArray();
+        return (neighboringChunks.ToArray(), IsDiagonal.ToArray());
     }
 
 
@@ -1050,22 +1053,22 @@ public class Chunk : MonoBehaviour
 
     public void UpdateNeighborChunks()
     {
-        Chunk[] chunks = GetNeighboringChunks(false);
-        for (int i = 0; i < chunks.Length; i++) 
-        {
-            chunks[i].GenerateMesh(false);
-        }
-    }
-
-
-    public void UpdateNeighborChunksLighting()
-    {
-        Chunk[] chunks = GetNeighboringChunks(true);
+        (Chunk[], bool[]) chunksData = GetNeighboringChunks(true);
+        Chunk[] chunks = chunksData.Item1;
+        bool[] isDiagonal = chunksData.Item2;
         for (int i = 0; i < chunks.Length; i++)
         {
-            chunks[i].GenerateLighting(true, true);
+            if (!isDiagonal[i])
+            {
+                chunks[i].GenerateMesh(false);
+            }
+            else
+            {
+                chunks[i].GenerateLighting(false, true);
+            }
         }
     }
+
     private void AddQuad(List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, Vector3 bottomLeft, Vector3 bottomRight, Vector3 topLeft, Vector3 topRight, int blockId, bool inverted = false)
     {
         int vertIndex = vertices.Count;

@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Unity.VisualScripting;
 using UnityEngine;
 
@@ -126,6 +127,7 @@ public class ChunkManager : MonoBehaviour
     }
 
 
+
     byte[,,] SetTerrain(Chunk chunk)
     {
         byte[,,] VoxelData = new byte[ChunkSize, ChunkSize, ChunkSize];
@@ -190,6 +192,41 @@ public class ChunkManager : MonoBehaviour
                 }
             }
         }
+
+        for (int x = 0; x < ChunkSize; x++)
+        {
+            for (int y = 0; y < ChunkSize; y++)
+            {
+                for (int z = 0; z < ChunkSize; z++)
+                {
+                    if (VoxelData[x, y, z] == 1) // check for grass
+                    {
+                        if (y + 10 < ChunkSize && x + 2 < ChunkSize && z + 2 < ChunkSize
+                            && x - 2 > 0 && z - 2 > 0 
+                            && Random.value > 0.95)
+                        {
+                            for (int i = y + 1; i < y + 4; i++)
+                            {
+                                VoxelData[x, i, z] = 7; // add trunk
+                            }
+                            // Add leaves on top
+                            for (int offsetY = y + 4; offsetY < y + 8; offsetY++) // adjust the height range as needed
+                            {
+                                for (int offsetX = -2; offsetX <= 2; offsetX++)
+                                {
+                                    for (int offsetZ = -2; offsetZ <= 2; offsetZ++)
+                                    {
+                                        VoxelData[x + offsetX, offsetY, z + offsetZ] = 8; // assuming 8 is the ID for leaves
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                }
+            }
+        }
+
         return VoxelData;
     }
 

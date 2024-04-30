@@ -688,6 +688,11 @@ public class Chunk : MonoBehaviour
                                 {
                                     AddQuad(vertices, triangles, uvs, quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3], VoxelData[x, y, z], Inverted);
                                 }
+                                else if (isTransparentNoCollision)
+                                {
+                                    AddQuad(verticesNoCollisionTransparent, trianglesNoCollisionTransparent, uvsNoCollisionTransparent, quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3],
+                                           VoxelData[x, y, z], Inverted);
+                                }
                                 else if (isTransparent)
                                 {
                                     AddQuad(verticesTransparent, trianglesTransparent, uvsTransparent,
@@ -696,11 +701,6 @@ public class Chunk : MonoBehaviour
                                 else if (hasNoCollision)
                                 {
                                     AddQuad(verticesNoCollision, trianglesNoCollision, uvsNoCollision, quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3], VoxelData[x, y, z], Inverted);
-                                }
-                                else if (isTransparentNoCollision)
-                                {
-                                    AddQuad(verticesNoCollisionTransparent, trianglesNoCollisionTransparent, uvsNoCollisionTransparent, quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3],
-                                           VoxelData[x, y, z], Inverted);
                                 }
                             }
                         }

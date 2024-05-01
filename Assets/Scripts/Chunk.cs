@@ -358,36 +358,39 @@ public class Chunk : MonoBehaviour
 
     private (byte[,,] R, byte[,,] G, byte[,,] B) CalculateChunkLighting(Chunk chunk, bool generateSun, bool generatePoint)
     {
-        if (generateSun)
+        Task task = Task.Run(async () =>
         {
-            chunk.LightDataSun = new byte[ChunkSize, ChunkSize, ChunkSize];
-            Chunk AboveChunk = ChunkManager.Instance.GetNeighboringChunk(chunk.currentPos, 0, 1, 0);
-
-            SunLighting(AboveChunk, chunk);
-        }
-
-        if (generatePoint)
-        {
-            chunk.LightDataR = new byte[ChunkSize, ChunkSize, ChunkSize];
-            chunk.LightDataG = new byte[ChunkSize, ChunkSize, ChunkSize];
-            chunk.LightDataB = new byte[ChunkSize, ChunkSize, ChunkSize];
-            Chunk[] NeighborChunks = GetNeighboringChunks(true).Item1;
-
-            //CurrentChunkPass
-            Parallel.For(0, ChunkSize, x =>
+            if (generateSun)
             {
-                for (int y = 0; y < ChunkSize; y++)
+                chunk.LightDataSun = new byte[ChunkSize, ChunkSize, ChunkSize];
+                Chunk AboveChunk = ChunkManager.Instance.GetNeighboringChunk(chunk.currentPos, 0, 1, 0);
+
+                SunLighting(AboveChunk, chunk);
+            }
+
+            if (generatePoint)
+            {
+                chunk.LightDataR = new byte[ChunkSize, ChunkSize, ChunkSize];
+                chunk.LightDataG = new byte[ChunkSize, ChunkSize, ChunkSize];
+                chunk.LightDataB = new byte[ChunkSize, ChunkSize, ChunkSize];
+                Chunk[] NeighborChunks = GetNeighboringChunks(true).Item1;
+
+                //CurrentChunkPass
+
+                for (int x = 0; x < ChunkSize; x++)
                 {
-                    for (int z = 0; z < ChunkSize; z++)
+                    for (int y = 0; y < ChunkSize; y++)
                     {
-                        ProcessVoxelPointLights(x, y, z, chunk, NeighborChunks);
+                        for (int z = 0; z < ChunkSize; z++)
+                        {
+                            ProcessVoxelPointLights(x, y, z, chunk, NeighborChunks);
+                        }
                     }
                 }
-            });
-        }
-
-
-
+            }
+            await Task.CompletedTask;
+        });
+        task.Wait();
 
         return (chunk.LightDataR, chunk.LightDataG, chunk.LightDataB);
     }
@@ -421,6 +424,11 @@ public class Chunk : MonoBehaviour
 
     private void SunLighting(Chunk AboveChunk, Chunk chunk)
     {
+        float GlobalLightValue = ChunkManager.Instance.SkyIntensity;
+        float adjustedDecrement = GlobalLightValue / 15;
+
+
+
         byte[,,] AboveChunkData = new byte[ChunkSize, ChunkSize, ChunkSize];
         byte[,,] AboveLightDataSun = new byte[ChunkSize, ChunkSize, ChunkSize];
         if (AboveChunk != null)
@@ -429,7 +437,7 @@ public class Chunk : MonoBehaviour
             AboveLightDataSun = AboveChunk.GetLightDataSun();
         }
 
-        Parallel.For(0, ChunkSize, x =>
+        for (int x = 0; x < ChunkSize; x++)
         {
             for (int z = 0; z < ChunkSize; z++)
             {
@@ -454,6 +462,7 @@ public class Chunk : MonoBehaviour
                     LightValueSun = (byte)ChunkManager.Instance.SkyIntensity;
                 }
 
+                float GraidentValue = LightValueSun;
                 for (int y = ChunkSize - 1; y >= 0; y--)
                 {
                     //this is for other chunks to affect this chunk
@@ -466,8 +475,8 @@ public class Chunk : MonoBehaviour
                         byte Voxel = chunk.VoxelData[x, y, z];
                         if (!(Voxel == 0 || ReturnType(Voxel, TransparentIDs)))
                         {
-                            LightValueSun = (byte)Mathf.Clamp(LightValueSun - 1, 0, 15);
-                            chunk.LightDataSun[x, y, z] = LightValueSun;
+                            GraidentValue = Mathf.Clamp(GraidentValue - adjustedDecrement, 0, 15);
+                            chunk.LightDataSun[x, y, z] = (byte)Mathf.RoundToInt(GraidentValue);
                         }
                     }
                 }
@@ -480,13 +489,14 @@ public class Chunk : MonoBehaviour
                         {
                             for (int voxely = y; voxely >= 0; voxely--)
                             {
-                                chunk.LightDataSun[x, voxely, z] = (byte)Mathf.Clamp(chunk.LightDataSun[x, voxely, z] - 1, 0, 15);
+                                GraidentValue = Mathf.Clamp(chunk.LightDataSun[x, voxely, z] - adjustedDecrement, 0, 15);
+                                chunk.LightDataSun[x, voxely, z] = (byte)Mathf.RoundToInt(GraidentValue);
                             }
                         }
                     }
                 }
             }
-        });
+        };
     }
 
     private void AddLightWithRadius(Chunk currentChunk, (byte, byte, byte) rgb, int centerX, int centerY, int centerZ, int radius, float falloff, bool additive)

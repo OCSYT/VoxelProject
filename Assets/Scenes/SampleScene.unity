@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0, g: 0.16906722, b: 0.99999905, a: 1}
+  m_IndirectSpecularColor: {r: 0.064758085, g: 0.28051725, b: 0.78320104, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -384,7 +384,8 @@ MonoBehaviour:
   NoCollisonBlocks: 0f10
   TransparentBlocks: 080910
   SkyIntensity: 15
-  Daylength: 1
+  Daylength: 2
+  GameTime: 0
   SkyShader: {fileID: 2100000, guid: 9b085bb2e9811e149ae05d16c4fa2328, type: 2}
 --- !u!1 &832575517
 GameObject:

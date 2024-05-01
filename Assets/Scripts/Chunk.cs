@@ -4,11 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Unity.VisualScripting;
-using UnityEditor.Search;
 using UnityEngine;
-using UnityEngine.Experimental.Rendering.RenderGraphModule;
-using static UnityEditor.Searcher.SearcherWindow.Alignment;
-using static UnityEditor.ShaderGraph.Internal.KeywordDependentCollection;
 
 
 public class Chunk : MonoBehaviour
@@ -237,7 +233,7 @@ public class Chunk : MonoBehaviour
         Lighting.Add(new Color(lightLevelR, lightLevelG, lightLevelB));
     }
 
-    public async void GenerateLighting(bool generateSun, bool generatePoint)
+    public void GenerateLighting(bool generateSun, bool generatePoint)
     {
 
         if (LightingGenerating || GetMax(VoxelData) == 0) return;
@@ -260,8 +256,9 @@ public class Chunk : MonoBehaviour
         };
 
 
-        await CalculateChunkLighting(this, generateSun, generatePoint);
-        await Task.Run(async () =>
+        CalculateChunkLighting(this, generateSun, generatePoint);
+
+        Task task = Task.Run(async () =>
         {
             for (int x = 0; x < ChunkSize; x++)
             {
@@ -275,7 +272,7 @@ public class Chunk : MonoBehaviour
                         Vector3Int voxelPos = new Vector3Int(x, y, z);
 
 
-                        for(int i = 0; i < directions.Length; i++)
+                        for (int i = 0; i < directions.Length; i++)
                         {
                             Vector3Int direction = directions[i];
                             int dx = direction.x;
@@ -315,6 +312,7 @@ public class Chunk : MonoBehaviour
             }
             await Task.CompletedTask;
         });
+        task.Wait();
 
 
 
@@ -358,7 +356,7 @@ public class Chunk : MonoBehaviour
 
 
 
-    private async Task<(byte[,,] R, byte[,,] G, byte[,,] B)> CalculateChunkLighting(Chunk chunk, bool generateSun, bool generatePoint)
+    private (byte[,,] R, byte[,,] G, byte[,,] B) CalculateChunkLighting(Chunk chunk, bool generateSun, bool generatePoint)
     {
         if (generateSun)
         {
@@ -376,58 +374,62 @@ public class Chunk : MonoBehaviour
             Chunk[] NeighborChunks = GetNeighboringChunks(true).Item1;
 
             //CurrentChunkPass
-            for (int x = 0; x < ChunkSize; x++)
+            Parallel.For(0, ChunkSize, x =>
             {
                 for (int y = 0; y < ChunkSize; y++)
                 {
                     for (int z = 0; z < ChunkSize; z++)
                     {
-                        if (VoxelData[x, y, z] == 10)
-                        {
-                            AddLightWithRadius(chunk, (15, 15, 15), x, y, z, 15, .1f, true);
-                        }
-                        for (int i = 0; i < NeighborChunks.Length; i++)
-                        {
-                            Chunk neighborChunk = NeighborChunks[i];
-                            if (neighborChunk)
-                            {
-                                Vector3Int offset = new Vector3Int(neighborChunk.currentPos.x - chunk.currentPos.x,
-                                                     neighborChunk.currentPos.y - chunk.currentPos.y,
-                                                     neighborChunk.currentPos.z - chunk.currentPos.z);
-                                if (neighborChunk.GetData()[x, y, z] == 10)
-                                {
-                                    int currentX = x + offset.x * ChunkSize;
-                                    int currentY = y + offset.y * ChunkSize;
-                                    int currentZ = z + offset.z * ChunkSize;
-
-                                    AddLightWithRadius(chunk, (15, 15, 15), currentX, currentY, currentZ, 15, .1f, true);
-                                }
-                            }
-                        }
+                        ProcessVoxelPointLights(x, y, z, chunk, NeighborChunks);
                     }
                 }
-            }
+            });
         }
 
 
 
 
-        await Task.CompletedTask;
         return (chunk.LightDataR, chunk.LightDataG, chunk.LightDataB);
+    }
+
+
+    void ProcessVoxelPointLights(int x, int y, int z, Chunk chunk, Chunk[] NeighborChunks)
+    {
+        if (VoxelData[x, y, z] == 10)
+        {
+            AddLightWithRadius(chunk, (15, 15, 15), x, y, z, 15, .1f, true);
+        }
+        for (int i = 0; i < NeighborChunks.Length; i++)
+        {
+            Chunk neighborChunk = NeighborChunks[i];
+            if (neighborChunk != null)
+            {
+                Vector3Int offset = new Vector3Int(neighborChunk.currentPos.x - chunk.currentPos.x,
+                                     neighborChunk.currentPos.y - chunk.currentPos.y,
+                                     neighborChunk.currentPos.z - chunk.currentPos.z);
+                if (neighborChunk.GetData()[x, y, z] == 10)
+                {
+                    int currentX = x + offset.x * ChunkSize;
+                    int currentY = y + offset.y * ChunkSize;
+                    int currentZ = z + offset.z * ChunkSize;
+
+                    AddLightWithRadius(chunk, (15, 15, 15), currentX, currentY, currentZ, 15, .1f, true);
+                }
+            }
+        }
     }
 
     private void SunLighting(Chunk AboveChunk, Chunk chunk)
     {
         byte[,,] AboveChunkData = new byte[ChunkSize, ChunkSize, ChunkSize];
         byte[,,] AboveLightDataSun = new byte[ChunkSize, ChunkSize, ChunkSize];
-        if (AboveChunk)
+        if (AboveChunk != null)
         {
             AboveChunkData = AboveChunk.GetData();
             AboveLightDataSun = AboveChunk.GetLightDataSun();
         }
 
-
-        for (int x = 0; x < ChunkSize; x++)
+        Parallel.For(0, ChunkSize, x =>
         {
             for (int z = 0; z < ChunkSize; z++)
             {
@@ -451,7 +453,6 @@ public class Chunk : MonoBehaviour
                 {
                     LightValueSun = (byte)ChunkManager.Instance.SkyIntensity;
                 }
-
 
                 for (int y = ChunkSize - 1; y >= 0; y--)
                 {
@@ -485,7 +486,7 @@ public class Chunk : MonoBehaviour
                     }
                 }
             }
-        }
+        });
     }
 
     private void AddLightWithRadius(Chunk currentChunk, (byte, byte, byte) rgb, int centerX, int centerY, int centerZ, int radius, float falloff, bool additive)
@@ -708,6 +709,7 @@ public class Chunk : MonoBehaviour
                     }
                 }
             }
+            await Task.CompletedTask;
         });
 
 

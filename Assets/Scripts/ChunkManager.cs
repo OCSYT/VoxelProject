@@ -139,6 +139,7 @@ public class ChunkManager : MonoBehaviour
                 {
                     chunk.SetData(chunkCache[chunkPosition]);
                 }
+                chunk.GenerateTerrain();
                 activeChunks.Add(chunkPosition, chunk);
                 activeChunksObj.Add(chunkPosition, newChunk);
             }

@@ -49,7 +49,7 @@ public class Chunk : MonoBehaviour
     void Start()
     {
         currentSunLevel = ChunkManager.Instance.SkyIntensity;
-        InvokeRepeating("Tick", 0, 1);
+        InvokeRepeating("Tick", 0, .1f);
     }
 
     void Tick()
@@ -572,10 +572,9 @@ public class Chunk : MonoBehaviour
     private bool isGeneratingMesh = false;
 
 
-    public byte[,,] UpdateCurrentVoxels()
+    public void UpdateCurrentVoxels()
     {
-        byte[,,] ModifiedVoxelData = VoxelData;
-        Task task = Task.Run(() =>
+        Task.Run(() =>
         {
             Vector3 chunkCornerWorldPos = currentPos * ChunkSize;
             for (int x = 0; x < ChunkSize; x++)
@@ -586,17 +585,15 @@ public class Chunk : MonoBehaviour
                     {
                         Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
 
-                        if (ModifiedVoxelData[x, y, z] == 0 && IsWaterNeighbor(x, y, z))
+                        if (VoxelData[x, y, z] == 0 && IsWaterNeighbor(x, y, z))
                         {
-                            ModifiedVoxelData[x, y, z] = 16;
+                            VoxelData[x, y, z] = 16;
                         }
                     }
                 }
 
             }
         });
-        task.Wait();
-        return ModifiedVoxelData;
     }
     private bool IsWaterNeighbor(int x, int y, int z)
     {
@@ -658,6 +655,7 @@ public class Chunk : MonoBehaviour
     public async void GenerateMesh(bool updateNeighbors)
     {
         if(isGeneratingMesh) return;
+        UpdateCurrentVoxels();
         isGeneratingMesh = true;
 
         List<Vector3> vertices = new List<Vector3>();

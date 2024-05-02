@@ -51,7 +51,7 @@ public class ChunkManager : MonoBehaviour
     void Update()
     {
         GameTime += Time.deltaTime;
-        float SkyValue = 15 - (Mathf.Sin(GameTime * Daylength/500) * 15);
+        float SkyValue = 15 - (Mathf.Sin(GameTime * Daylength / 500) * 15);
         SkyIntensity = Mathf.RoundToInt(SkyValue);
         if (SkyShader)
         {
@@ -139,14 +139,15 @@ public class ChunkManager : MonoBehaviour
                 {
                     chunk.SetData(chunkCache[chunkPosition]);
                 }
-                chunk.GenerateTerrain();
                 activeChunks.Add(chunkPosition, chunk);
                 activeChunksObj.Add(chunkPosition, newChunk);
             }
             yield return null;
         }
     }
-
+    public float waterLevel = 10;
+    public float height = 25;
+    public float scale = 0.01f;
 
 
     byte[,,] SetTerrain(Chunk chunk)
@@ -167,9 +168,6 @@ public class ChunkManager : MonoBehaviour
 
                     byte voxelValue = 0;
 
-                    float waterLevel = 10;
-                    float height = 25;
-                    float scale = 0.01f; 
                     float perlinValue = Mathf.PerlinNoise((voxelPosition.x + (seed/1000)) * scale, (voxelPosition.z + (seed / 1000)) * scale) * height;
 
                     int ycoord = (byte)(Mathf.RoundToInt(perlinValue));

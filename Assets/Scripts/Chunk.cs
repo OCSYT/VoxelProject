@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 
 public class Chunk : MonoBehaviour
@@ -48,7 +49,7 @@ public class Chunk : MonoBehaviour
     void Start()
     {
         currentSunLevel = ChunkManager.Instance.SkyIntensity;
-        InvokeRepeating("Tick", 0, .1f);
+        InvokeRepeating("Tick", 0, 1);
     }
 
     void Tick()
@@ -569,6 +570,91 @@ public class Chunk : MonoBehaviour
 
 
     private bool isGeneratingMesh = false;
+
+
+    public byte[,,] UpdateCurrentVoxels()
+    {
+        byte[,,] ModifiedVoxelData = VoxelData;
+        Task task = Task.Run(() =>
+        {
+            Vector3 chunkCornerWorldPos = currentPos * ChunkSize;
+            for (int x = 0; x < ChunkSize; x++)
+            {
+                for (int y = 0; y < ChunkSize; y++)
+                {
+                    for (int z = 0; z < ChunkSize; z++)
+                    {
+                        Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
+
+                        if (ModifiedVoxelData[x, y, z] == 0 && IsWaterNeighbor(x, y, z))
+                        {
+                            ModifiedVoxelData[x, y, z] = 16;
+                        }
+                    }
+                }
+
+            }
+        });
+        task.Wait();
+        return ModifiedVoxelData;
+    }
+    private bool IsWaterNeighbor(int x, int y, int z)
+    {
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            for (int dy = 0; dy <= 1; dy++)
+            {
+                for (int dz = -1; dz <= 1; dz++)
+                {
+                    if (dx == 0 && dy == 0 && dz == 0)
+                        continue;
+
+                    int nx = x + dx;
+                    int ny = y + dy;
+                    int nz = z + dz;
+                    if (nx >= 0 && nx < ChunkSize &&
+                        ny >= 0 && ny < ChunkSize &&
+                        nz >= 0 && nz < ChunkSize &&
+                        VoxelData[nx, ny, nz] == 16)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        Vector3Int chunkPos = Vector3Int.zero;
+                        if (nx < 0)
+                            chunkPos.x -= 1;
+                        else if (nx >= ChunkSize)
+                            chunkPos.x += 1;
+                        if (ny < 0)
+                            chunkPos.y -= 1;
+                        else if (ny >= ChunkSize)
+                            chunkPos.y += 1;
+                        if (nz < 0)
+                            chunkPos.z -= 1;
+                        else if (nz >= ChunkSize)
+                            chunkPos.z += 1;
+
+                        Chunk neighborChunk = ChunkManager.Instance.GetNeighboringChunk(currentPos, chunkPos.x, chunkPos.y, chunkPos.z);
+                        if (neighborChunk != null)
+                        {
+                            int localVoxelX = nx < 0 ? ChunkSize + nx : nx >= ChunkSize ? nx - ChunkSize : nx;
+                            int localVoxelY = ny < 0 ? ChunkSize + ny : ny >= ChunkSize ? ny - ChunkSize : ny;
+                            int localVoxelZ = nz < 0 ? ChunkSize + nz : nz >= ChunkSize ? nz - ChunkSize : nz;
+
+                            if (neighborChunk.GetData()[localVoxelX, localVoxelY, localVoxelZ] == 16)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+
     public async void GenerateMesh(bool updateNeighbors)
     {
         if(isGeneratingMesh) return;
@@ -1052,49 +1138,52 @@ public class Chunk : MonoBehaviour
 
     private void AddQuad(List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, Vector3 bottomLeft, Vector3 bottomRight, Vector3 topLeft, Vector3 topRight, int blockId, bool inverted = false)
     {
+        Vector3 center = Vector3.zero;
         int vertIndex = vertices.Count;
-        int TextureID = blockId - 1;
+        int textureID = blockId - 1;
+;
 
-        if (!inverted)
-        {
-            vertices.Add(bottomLeft);
-            vertices.Add(bottomRight);
-            vertices.Add(topLeft);
-            vertices.Add(topRight);
-        }
-        else
-        {
-            vertices.Add(bottomRight);
-            vertices.Add(bottomLeft);
-            vertices.Add(topRight);
-            vertices.Add(topLeft);
-        }
+        // Add vertices
+        vertices.Add(bottomLeft);
+        vertices.Add(bottomRight);
+        vertices.Add(topLeft);
+        vertices.Add(topRight);
 
+        // Add UVs
         float atlasSize = TextureSize;
         float blockSize = BlockSize;
         float blocksPerRow = atlasSize / blockSize;
-        float row = Mathf.Floor(TextureID / blocksPerRow);
-        float col = TextureID % blocksPerRow;
+        float row = Mathf.Floor(textureID / blocksPerRow);
+        float col = textureID % blocksPerRow;
         float blockX = col * (blockSize / atlasSize);
         float blockY = row * (blockSize / atlasSize);
         float uvSize = 1.0f / blocksPerRow;
 
+        Vector2[] quadUVs;
         if (!inverted)
         {
-            uvs.Add(new Vector2(blockX, blockY));
-            uvs.Add(new Vector2(blockX + uvSize, blockY));
-            uvs.Add(new Vector2(blockX, blockY + uvSize));
-            uvs.Add(new Vector2(blockX + uvSize, blockY + uvSize));
+            quadUVs = new Vector2[]
+            {
+            new Vector2(blockX, blockY),
+            new Vector2(blockX + uvSize, blockY),
+            new Vector2(blockX, blockY + uvSize),
+            new Vector2(blockX + uvSize, blockY + uvSize)
+            };
         }
         else
         {
-            uvs.Add(new Vector2(blockX + uvSize, blockY));
-            uvs.Add(new Vector2(blockX, blockY));
-            uvs.Add(new Vector2(blockX + uvSize, blockY + uvSize));
-            uvs.Add(new Vector2(blockX, blockY + uvSize));
+            quadUVs = new Vector2[]
+            {
+            new Vector2(blockX + uvSize, blockY),
+            new Vector2(blockX, blockY),
+            new Vector2(blockX + uvSize, blockY + uvSize),
+            new Vector2(blockX, blockY + uvSize)
+            };
         }
 
+        uvs.AddRange(quadUVs);
 
+        // Add triangles
         triangles.Add(vertIndex);
         triangles.Add(vertIndex + 2);
         triangles.Add(vertIndex + 1);
@@ -1102,8 +1191,5 @@ public class Chunk : MonoBehaviour
         triangles.Add(vertIndex + 3);
         triangles.Add(vertIndex + 1);
     }
-
-
-
-
 }
+

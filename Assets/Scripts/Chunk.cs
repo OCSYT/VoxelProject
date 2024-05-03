@@ -572,90 +572,10 @@ public class Chunk : MonoBehaviour
     private bool isGeneratingMesh = false;
 
 
-    public void UpdateCurrentVoxels()
-    {
-        Task.Run(() =>
-        {
-            Vector3 chunkCornerWorldPos = currentPos * ChunkSize;
-            for (int x = 0; x < ChunkSize; x++)
-            {
-                for (int y = 0; y < ChunkSize; y++)
-                {
-                    for (int z = 0; z < ChunkSize; z++)
-                    {
-                        Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
-
-                        if (VoxelData[x, y, z] == 0 && IsWaterNeighbor(x, y, z))
-                        {
-                            VoxelData[x, y, z] = 16;
-                        }
-                    }
-                }
-
-            }
-        });
-    }
-    private bool IsWaterNeighbor(int x, int y, int z)
-    {
-        for (int dx = -1; dx <= 1; dx++)
-        {
-            for (int dy = 0; dy <= 1; dy++)
-            {
-                for (int dz = -1; dz <= 1; dz++)
-                {
-                    if (dx == 0 && dy == 0 && dz == 0)
-                        continue;
-
-                    int nx = x + dx;
-                    int ny = y + dy;
-                    int nz = z + dz;
-                    if (nx >= 0 && nx < ChunkSize &&
-                        ny >= 0 && ny < ChunkSize &&
-                        nz >= 0 && nz < ChunkSize &&
-                        VoxelData[nx, ny, nz] == 16)
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        Vector3Int chunkPos = Vector3Int.zero;
-                        if (nx < 0)
-                            chunkPos.x -= 1;
-                        else if (nx >= ChunkSize)
-                            chunkPos.x += 1;
-                        if (ny < 0)
-                            chunkPos.y -= 1;
-                        else if (ny >= ChunkSize)
-                            chunkPos.y += 1;
-                        if (nz < 0)
-                            chunkPos.z -= 1;
-                        else if (nz >= ChunkSize)
-                            chunkPos.z += 1;
-
-                        Chunk neighborChunk = ChunkManager.Instance.GetNeighboringChunk(currentPos, chunkPos.x, chunkPos.y, chunkPos.z);
-                        if (neighborChunk != null)
-                        {
-                            int localVoxelX = nx < 0 ? ChunkSize + nx : nx >= ChunkSize ? nx - ChunkSize : nx;
-                            int localVoxelY = ny < 0 ? ChunkSize + ny : ny >= ChunkSize ? ny - ChunkSize : ny;
-                            int localVoxelZ = nz < 0 ? ChunkSize + nz : nz >= ChunkSize ? nz - ChunkSize : nz;
-
-                            if (neighborChunk.GetData()[localVoxelX, localVoxelY, localVoxelZ] == 16)
-                            {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
 
     public async void GenerateMesh(bool updateNeighbors)
     {
         if(isGeneratingMesh) return;
-        UpdateCurrentVoxels();
         isGeneratingMesh = true;
 
         List<Vector3> vertices = new List<Vector3>();

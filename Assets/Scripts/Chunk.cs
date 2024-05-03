@@ -10,6 +10,7 @@ using UnityEngine.UIElements;
 
 public class Chunk : MonoBehaviour
 {
+
     private int ChunkSize = 0;
     private byte[,,] VoxelData;
     private byte[,,] LightDataR;
@@ -46,23 +47,27 @@ public class Chunk : MonoBehaviour
     private Coroutine LightingCoroutine;
     private bool LightingGenerating;
     private int currentSunLevel;
+    private Dictionary<string, byte> BlockList = new Dictionary<string, byte>();
+    private Dictionary<string, byte[]> BlockListLight = new Dictionary<string, byte[]>();
     void Start()
     {
         currentSunLevel = ChunkManager.Instance.SkyIntensity;
-        InvokeRepeating("Tick", 0, .1f);
+        InvokeRepeating("Tick", 0, 1f);
     }
 
     void Tick()
     {
-        if(ChunkManager.Instance.SkyIntensity != currentSunLevel)
+        if (ChunkManager.Instance.SkyIntensity != currentSunLevel)
         {
             currentSunLevel = ChunkManager.Instance.SkyIntensity;
             GenerateLighting(true, false);
         }
     }
 
-    public void Init(Material mat,Material transparentMat, byte[] transparent, byte[] nocollision, int _ChunkSize, float _TextureSize, float _BlockSize, Vector3Int Position)
+    public void Init(Material mat, Material transparentMat, byte[] transparent, byte[] nocollision, int _ChunkSize, float _TextureSize, float _BlockSize, Vector3Int Position)
     {
+        BlockList = ChunkManager.Instance.BlockList;
+        BlockListLight = ChunkManager.Instance.BlockListLight;
         currentPos = Position;
         VoxelData = new byte[_ChunkSize, _ChunkSize, _ChunkSize];
         LightDataR = new byte[_ChunkSize, _ChunkSize, _ChunkSize];
@@ -103,7 +108,7 @@ public class Chunk : MonoBehaviour
         _MeshRendererNoCollision = NoCollisionObj.transform.AddComponent<MeshRenderer>();
         _MeshRendererNoCollision.sharedMaterial = mat;
         _MeshNoCollision = new Mesh();
-        _MeshFilterNoCollision .mesh = _MeshNoCollision;
+        _MeshFilterNoCollision.mesh = _MeshNoCollision;
 
         NoCollisionObjTransparent = new GameObject("NoCollisionTransparent").transform;
         NoCollisionObjTransparent.transform.parent = transform;
@@ -172,15 +177,15 @@ public class Chunk : MonoBehaviour
     {
         if (IsValidPosition(x, y, z))
         {
-            if(channel == 0)
+            if (channel == 0)
             {
                 LightDataR[x, y, z] = value;
             }
-            if(channel == 1)
+            if (channel == 1)
             {
                 LightDataG[x, y, z] = value;
             }
-            if(channel == 2)
+            if (channel == 2)
             {
                 LightDataB[x, y, z] = value;
             }
@@ -226,7 +231,7 @@ public class Chunk : MonoBehaviour
         float sunLevel = LightDataSun[Position.x, Position.y, Position.z];
         float lightLevelR = Mathf.Clamp((float)LightDataR[Position.x, Position.y, Position.z] + sunLevel + .1f, 0, 15) / 15;
         float lightLevelG = Mathf.Clamp((float)LightDataG[Position.x, Position.y, Position.z] + sunLevel + .1f, 0, 15) / 15;
-        float lightLevelB = Mathf.Clamp((float)LightDataB[Position.x, Position.y, Position.z] + sunLevel + .1f,0, 15) / 15;
+        float lightLevelB = Mathf.Clamp((float)LightDataB[Position.x, Position.y, Position.z] + sunLevel + .1f, 0, 15) / 15;
 
         Lighting.Add(new Color(lightLevelR, lightLevelG, lightLevelB));
         Lighting.Add(new Color(lightLevelR, lightLevelG, lightLevelB));
@@ -267,7 +272,7 @@ public class Chunk : MonoBehaviour
                 {
                     for (int z = 0; z < ChunkSize; z++)
                     {
-                        if (VoxelData[x, y, z] == 0)
+                        if (VoxelData[x, y, z] == BlockList["Air"])
                             continue;
 
                         Vector3Int voxelPos = new Vector3Int(x, y, z);
@@ -376,9 +381,7 @@ public class Chunk : MonoBehaviour
                 chunk.LightDataB = new byte[ChunkSize, ChunkSize, ChunkSize];
                 Chunk[] NeighborChunks = GetNeighboringChunks(true).Item1;
 
-                //CurrentChunkPass
-
-                for (int x = 0; x < ChunkSize; x++)
+                Parallel.For(0, ChunkSize, x =>
                 {
                     for (int y = 0; y < ChunkSize; y++)
                     {
@@ -387,7 +390,7 @@ public class Chunk : MonoBehaviour
                             ProcessVoxelPointLights(x, y, z, chunk, NeighborChunks);
                         }
                     }
-                }
+                });
             }
             await Task.CompletedTask;
         });
@@ -395,14 +398,47 @@ public class Chunk : MonoBehaviour
 
         return (chunk.LightDataR, chunk.LightDataG, chunk.LightDataB);
     }
+    private string FindKeyFromValue(Dictionary<string, byte> dictionary, byte value)
+    {
+        foreach (var kvp in dictionary)
+        {
+            if (kvp.Value == value)
+            {
+                return kvp.Key;
+            }
+        }
+        return null;
+    }
+
+
+
+
+
 
 
     void ProcessVoxelPointLights(int x, int y, int z, Chunk chunk, Chunk[] NeighborChunks)
     {
-        if (VoxelData[x, y, z] == 10)
+        if (VoxelData[x, y, z] != BlockList["Air"])
         {
-            AddLightWithRadius(chunk, (15, 15, 15), x, y, z, 15, .1f, true);
+
+            string key = FindKeyFromValue(BlockList, VoxelData[x, y, z]);
+            var lightValues = BlockListLight[key];
+            float max = lightValues[0];
+            if (lightValues[1] > max)
+            {
+                max = lightValues[1];
+            }
+            if (lightValues[2] > max)
+            {
+                max = lightValues[2];
+            }
+
+            if (max > 0)
+            {
+                AddLightWithRadius(chunk, (BlockListLight[key][0], BlockListLight[key][1], BlockListLight[key][2]), x, y, z, (byte)max, .1f, true);
+            }
         }
+
         for (int i = 0; i < NeighborChunks.Length; i++)
         {
             Chunk neighborChunk = NeighborChunks[i];
@@ -411,13 +447,29 @@ public class Chunk : MonoBehaviour
                 Vector3Int offset = new Vector3Int(neighborChunk.currentPos.x - chunk.currentPos.x,
                                      neighborChunk.currentPos.y - chunk.currentPos.y,
                                      neighborChunk.currentPos.z - chunk.currentPos.z);
-                if (neighborChunk.GetData()[x, y, z] == 10)
-                {
-                    int currentX = x + offset.x * ChunkSize;
-                    int currentY = y + offset.y * ChunkSize;
-                    int currentZ = z + offset.z * ChunkSize;
 
-                    AddLightWithRadius(chunk, (15, 15, 15), currentX, currentY, currentZ, 15, .1f, true);
+                byte[,,] ChunkData = neighborChunk.GetData();
+                if (ChunkData[x, y, z] != BlockList["Air"])
+                {
+                    string key = FindKeyFromValue(BlockList, ChunkData[x, y, z]);
+
+                    var lightValues = BlockListLight[key];
+                    float max = lightValues[0];
+                    if (lightValues[1] > max)
+                    {
+                        max = lightValues[1];
+                    }
+                    if (lightValues[2] > max)
+                    {
+                        max = lightValues[2];
+                    }
+                    if (max > 0)
+                    {
+                        int currentX = x + offset.x * ChunkSize;
+                        int currentY = y + offset.y * ChunkSize;
+                        int currentZ = z + offset.z * ChunkSize;
+                        AddLightWithRadius(chunk, (BlockListLight[key][0], BlockListLight[key][1], BlockListLight[key][2]), currentX, currentY, currentZ, (byte)max, .1f, true);
+                    }
                 }
             }
         }
@@ -451,7 +503,7 @@ public class Chunk : MonoBehaviour
                         byte AboveVoxel = AboveChunkData[x, yAbove, z];
                         LightValueSun = AboveLightDataSun[x, yAbove, z];
 
-                        if (!(AboveVoxel == 0 || ReturnType(AboveVoxel, TransparentIDs)))
+                        if (!(AboveVoxel == BlockList["Air"] || ReturnType(AboveVoxel, TransparentIDs)))
                         {
                             IsEmpty = false;
                             break;
@@ -474,7 +526,7 @@ public class Chunk : MonoBehaviour
                     else
                     {
                         byte Voxel = chunk.VoxelData[x, y, z];
-                        if (!(Voxel == 0 || ReturnType(Voxel, TransparentIDs)))
+                        if (!(Voxel == BlockList["Air"] || ReturnType(Voxel, TransparentIDs)))
                         {
                             GraidentValue = Mathf.Clamp(GraidentValue - adjustedDecrement, 0, 15);
                             chunk.LightDataSun[x, y, z] = (byte)Mathf.RoundToInt(GraidentValue);
@@ -486,7 +538,7 @@ public class Chunk : MonoBehaviour
                     for (int y = 0; y < ChunkSize; y++)
                     {
                         byte Voxel = chunk.VoxelData[x, y, z];
-                        if (!(Voxel == 0 || ReturnType(Voxel, TransparentIDs)))
+                        if (!(Voxel == BlockList["Air"] || ReturnType(Voxel, TransparentIDs)))
                         {
                             for (int voxely = y; voxely >= 0; voxely--)
                             {
@@ -504,7 +556,7 @@ public class Chunk : MonoBehaviour
     {
         int radiusSquared = radius * radius;
 
-        for (int x = -radius; x <= radius; x++)
+        Parallel.For(-radius, radius, x =>
         {
             for (int y = -radius; y <= radius; y++)
             {
@@ -553,7 +605,7 @@ public class Chunk : MonoBehaviour
                     }
                 }
             }
-        }
+        });
     }
 
 
@@ -607,7 +659,7 @@ public class Chunk : MonoBehaviour
                 {
                     for (int z = 0; z < ChunkSize; z++)
                     {
-                        if (VoxelData[x, y, z] == 0)
+                        if (VoxelData[x, y, z] == BlockList["Air"])
                             continue;
 
                         Vector3Int voxelPos = new Vector3Int(x, y, z);
@@ -908,7 +960,7 @@ public class Chunk : MonoBehaviour
 
             if (!isTransparent)
             {
-                if (NeighbourBlockID == 0 || NeighborisTransparent)
+                if (NeighbourBlockID == BlockList["Air"] || NeighborisTransparent)
                 {
                     return true;
                 }
@@ -924,7 +976,7 @@ public class Chunk : MonoBehaviour
 
 
 
-                if ((!isNeighborTransparentBlockSameType && NeighborisTransparent) || NeighbourBlockID == 0)
+                if ((!isNeighborTransparentBlockSameType && NeighborisTransparent) || NeighbourBlockID == BlockList["Air"])
                 {
                     return true;
                 }
@@ -956,14 +1008,23 @@ public class Chunk : MonoBehaviour
 
                     if (!isTransparent)
                     {
-                        if (NeighbourBlockID == 0 || NeighborisTransparent)
+                        if (NeighbourBlockID == BlockList["Air"] || NeighborisTransparent)
                         {
                             return true;
                         }
                     }
                     else
                     {
-                        if (NeighbourBlockID == 0 && !NeighborisTransparent)
+
+                        bool isNeighborTransparentBlockSameType = false;
+                        if (NeighbourBlockID == VoxelData[x, y, z])
+                        {
+                            isNeighborTransparentBlockSameType = true;
+                        }
+
+
+
+                        if ((!isNeighborTransparentBlockSameType && NeighborisTransparent) || NeighbourBlockID == BlockList["Air"])
                         {
                             return true;
                         }

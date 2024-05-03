@@ -5,26 +5,19 @@ using UnityEngine;
 public class BlockPlace : MonoBehaviour
 {
     public float Dist = 25;
+    public List<string> IgnoreBlocks = new List<string> { "air", "water", "lava" };
     public List<Block> blockList; // List of available blocks to place
-    public int selectedBlockIndex = 0;
+    private int selectedBlockIndex = 0;
     void Start()
     {
         if (blockList == null)
         {
             blockList = new List<Block>();
-            blockList.Add(new Block("Grass", (byte)1));
-            blockList.Add(new Block("Dirt", (byte)2));
-            blockList.Add(new Block("Stone", (byte)3));
-            blockList.Add(new Block("Cobblestone", (byte)4));
-            blockList.Add(new Block("Stone Bricks", (byte)5));
-            blockList.Add(new Block("Oak Planks", (byte)6));
-            blockList.Add(new Block("Oak Log", (byte)7));
-            blockList.Add(new Block("Leaves", (byte)8));
-            blockList.Add(new Block("Glass", (byte)9));
-            blockList.Add(new Block("Glowstone", (byte)10));
-            blockList.Add(new Block("Sand", (byte)11));
-            blockList.Add(new Block("Lava", (byte)15));
-            blockList.Add(new Block("Water", (byte)16));
+            foreach (var item in ChunkManager.Instance.BlockList)
+            {
+                if(IgnoreBlocks.Contains(item.Key.ToLower())) { continue; }
+                blockList.Add(new Block(item.Key, item.Value));
+            }
         }
     }
 

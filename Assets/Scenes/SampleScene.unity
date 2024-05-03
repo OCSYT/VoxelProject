@@ -370,6 +370,49 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6aa0f0b17cddcf44482a07ca6e67a67c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  Blocks:
+  - Name: Air
+    Value: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Grass
+    Value: 1
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Dirt
+    Value: 2
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Stone
+    Value: 3
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Cobblestone
+    Value: 4
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Stone Bricks
+    Value: 5
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Oak Planks
+    Value: 6
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Oak Log
+    Value: 7
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Leaves
+    Value: 8
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Glass
+    Value: 9
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Glowstone
+    Value: 10
+    Light: {r: 1, g: 1, b: 1, a: 1}
+  - Name: Sand
+    Value: 11
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Lava
+    Value: 15
+    Light: {r: 1, g: 0, b: 0, a: 1}
+  - Name: Water
+    Value: 16
+    Light: {r: 0, g: 0, b: 0, a: 1}
   seed: 1743733926
   ChunkBorderPrefab: {fileID: 6104295362550119401, guid: b2a1684a706b6a845ade531b06670eda,
     type: 3}
@@ -385,8 +428,11 @@ MonoBehaviour:
   TransparentBlocks: 080910
   SkyIntensity: 15
   Daylength: 2
-  GameTime: 0
+  GameTime: 200
   SkyShader: {fileID: 2100000, guid: 9b085bb2e9811e149ae05d16c4fa2328, type: 2}
+  waterLevel: 10
+  height: 25
+  scale: 0.01
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0

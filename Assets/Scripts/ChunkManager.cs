@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -5,8 +6,20 @@ using System.Threading.Tasks;
 using Unity.VisualScripting;
 using UnityEngine;
 
+
+
 public class ChunkManager : MonoBehaviour
 {
+    [Serializable]
+    public class Block
+    {
+        public string Name = "NewBlock";
+        public byte Value = 0;
+        public Color Light = Color.black;
+    }
+
+    public List<Block> Blocks = new List<Block>();
+
     public int seed = System.Guid.NewGuid().GetHashCode();
     public GameObject ChunkBorderPrefab;
     public bool ChunkBorders;
@@ -29,9 +42,18 @@ public class ChunkManager : MonoBehaviour
     private Coroutine generateChunksCoroutine;
     private Vector3 previousTargetPosition;
     private Dictionary<Vector3Int, byte[,,]> chunkCache = new Dictionary<Vector3Int, byte[,,]>();
+    public Dictionary<string, byte> BlockList = new Dictionary<string, byte>();
+    public Dictionary<string, byte[]> BlockListLight = new Dictionary<string, byte[]>();
+
 
     void Awake()
     {
+        foreach (var block in Blocks)
+        {
+            BlockList.Add(block.Name, block.Value);
+            BlockListLight.Add(block.Name, new byte[] { (byte)(block.Light.r * 15), (byte)(block.Light.g * 15), (byte)(block.Light.b * 15) });
+        }
+
         if (Instance == null)
         {
             Instance = this;

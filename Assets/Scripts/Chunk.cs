@@ -241,7 +241,6 @@ public class Chunk : MonoBehaviour
 
     public void GenerateLighting(bool generateSun, bool generatePoint)
     {
-
         if (LightingGenerating || GetMax(VoxelData) == 0) return;
         LightingGenerating = true;
 
@@ -250,22 +249,21 @@ public class Chunk : MonoBehaviour
         List<Color> LightingNoCollision = new List<Color>();
         List<Color> LightingNoCollisionTransparent = new List<Color>();
 
-        // Define the six directions as offsets from the current voxel position
-        Vector3Int[] directions = new Vector3Int[]
+
+        CalculateChunkLighting(this, generateSun, generatePoint);
+
+        Task task = Task.Run(async () =>
         {
+            Vector3Int[] directions = new Vector3Int[]
+            {
                     new Vector3Int(-1, 0, 0),   // Left
                     new Vector3Int(1, 0, 0),    // Right
                     new Vector3Int(0, -1, 0),   // Bottom
                     new Vector3Int(0, 1, 0),    // Top
                     new Vector3Int(0, 0, -1),   // Back
                     new Vector3Int(0, 0, 1)     // Front
-        };
+            };
 
-
-        CalculateChunkLighting(this, generateSun, generatePoint);
-
-        Task task = Task.Run(async () =>
-        {
             for (int x = 0; x < ChunkSize; x++)
             {
                 for (int y = 0; y < ChunkSize; y++)
@@ -357,11 +355,6 @@ public class Chunk : MonoBehaviour
 
 
 
-
-
-
-
-
     private (byte[,,] R, byte[,,] G, byte[,,] B) CalculateChunkLighting(Chunk chunk, bool generateSun, bool generatePoint)
     {
         Task task = Task.Run(async () =>
@@ -395,6 +388,7 @@ public class Chunk : MonoBehaviour
             await Task.CompletedTask;
         });
         task.Wait();
+
 
         return (chunk.LightDataR, chunk.LightDataG, chunk.LightDataB);
     }
@@ -475,82 +469,76 @@ public class Chunk : MonoBehaviour
         }
     }
 
-    private void SunLighting(Chunk AboveChunk, Chunk chunk)
+    private void SunLighting(Chunk aboveChunk, Chunk chunk)
     {
-        float GlobalLightValue = ChunkManager.Instance.SkyIntensity;
-        float adjustedDecrement = GlobalLightValue / 15;
+        float globalLightValue = ChunkManager.Instance.SkyIntensity;
+        float adjustedDecrement = globalLightValue / 15;
 
+        byte[,,] aboveChunkData = aboveChunk != null ? aboveChunk.GetData() : new byte[ChunkSize, ChunkSize, ChunkSize];
+        byte[,,] aboveLightDataSun = aboveChunk != null ? aboveChunk.GetLightDataSun() : new byte[ChunkSize, ChunkSize, ChunkSize];
 
-
-        byte[,,] AboveChunkData = new byte[ChunkSize, ChunkSize, ChunkSize];
-        byte[,,] AboveLightDataSun = new byte[ChunkSize, ChunkSize, ChunkSize];
-        if (AboveChunk != null)
-        {
-            AboveChunkData = AboveChunk.GetData();
-            AboveLightDataSun = AboveChunk.GetLightDataSun();
-        }
-
-        for (int x = 0; x < ChunkSize; x++)
+        Parallel.For(0, ChunkSize, x =>
         {
             for (int z = 0; z < ChunkSize; z++)
             {
-                bool IsEmpty = true;
-                byte LightValueSun = 0;
-                if (AboveChunk != null)
+                byte lightValueSun = 0;
+                bool isEmpty = true;
+
+                if (aboveChunk != null)
                 {
                     for (int yAbove = 0; yAbove < ChunkSize; yAbove++)
                     {
-                        byte AboveVoxel = AboveChunkData[x, yAbove, z];
-                        LightValueSun = AboveLightDataSun[x, yAbove, z];
+                        byte aboveVoxel = aboveChunkData[x, yAbove, z];
+                        lightValueSun = aboveLightDataSun[x, yAbove, z];
 
-                        if (!(AboveVoxel == BlockList["Air"] || ReturnType(AboveVoxel, TransparentIDs)))
+                        if (aboveVoxel != BlockList["Air"] && !ReturnType(aboveVoxel, TransparentIDs))
                         {
-                            IsEmpty = false;
+                            isEmpty = false;
                             break;
                         }
                     }
                 }
-                if (IsEmpty)
+
+                if (isEmpty)
                 {
-                    LightValueSun = (byte)ChunkManager.Instance.SkyIntensity;
+                    lightValueSun = (byte)globalLightValue;
                 }
 
-                float GraidentValue = LightValueSun;
+                float gradientValue = lightValueSun;
+
                 for (int y = ChunkSize - 1; y >= 0; y--)
                 {
-                    //this is for other chunks to affect this chunk
-                    if (IsEmpty)
+                    if (isEmpty)
                     {
-                        chunk.LightDataSun[x, y, z] = LightValueSun;
+                        chunk.LightDataSun[x, y, z] = lightValueSun;
                     }
                     else
                     {
-                        byte Voxel = chunk.VoxelData[x, y, z];
-                        if (!(Voxel == BlockList["Air"] || ReturnType(Voxel, TransparentIDs)))
+                        byte voxel = chunk.VoxelData[x, y, z];
+                        if (voxel != BlockList["Air"] && !ReturnType(voxel, TransparentIDs))
                         {
-                            GraidentValue = Mathf.Clamp(GraidentValue - adjustedDecrement, 0, 15);
-                            chunk.LightDataSun[x, y, z] = (byte)Mathf.RoundToInt(GraidentValue);
+                            gradientValue = Mathf.Clamp(gradientValue - adjustedDecrement, 0, 15);
+                            chunk.LightDataSun[x, y, z] = (byte)Mathf.RoundToInt(gradientValue);
                         }
                     }
                 }
-                if (IsEmpty)
+
+                if (isEmpty)
                 {
                     for (int y = 0; y < ChunkSize; y++)
                     {
-                        byte Voxel = chunk.VoxelData[x, y, z];
-                        if (!(Voxel == BlockList["Air"] || ReturnType(Voxel, TransparentIDs)))
+                        byte voxel = chunk.VoxelData[x, y, z];
+                        if (voxel != BlockList["Air"] && !ReturnType(voxel, TransparentIDs))
                         {
-                            for (int voxely = y; voxely >= 0; voxely--)
-                            {
-                                GraidentValue = Mathf.Clamp(chunk.LightDataSun[x, voxely, z] - adjustedDecrement, 0, 15);
-                                chunk.LightDataSun[x, voxely, z] = (byte)Mathf.RoundToInt(GraidentValue);
-                            }
+                            gradientValue = Mathf.Clamp(chunk.LightDataSun[x, y, z] - adjustedDecrement, 0, 15);
+                            chunk.LightDataSun[x, y, z] = (byte)Mathf.RoundToInt(gradientValue);
                         }
                     }
                 }
             }
-        };
+        });
     }
+
 
     private void AddLightWithRadius(Chunk currentChunk, (byte, byte, byte) rgb, int centerX, int centerY, int centerZ, int radius, float falloff, bool additive)
     {
@@ -1057,42 +1045,56 @@ public class Chunk : MonoBehaviour
 
         Vector3Int[] diagonalDirections =
         {
-            new Vector3Int(1, 1, 0),
-            new Vector3Int(1, -1, 0),
-            new Vector3Int(-1, 1, 0),
-            new Vector3Int(-1, -1, 0),
-            new Vector3Int(1, 0, 1),
-            new Vector3Int(1, 0, -1),
-            new Vector3Int(-1, 0, 1),
-            new Vector3Int(-1, 0, -1),
-            new Vector3Int(0, 1, 1),
-            new Vector3Int(0, 1, -1),
-            new Vector3Int(0, -1, 1),
-            new Vector3Int(0, -1, -1),
-        };
+        new Vector3Int(1, 1, 0),
+        new Vector3Int(1, -1, 0),
+        new Vector3Int(-1, 1, 0),
+        new Vector3Int(-1, -1, 0),
+        new Vector3Int(1, 0, 1),
+        new Vector3Int(1, 0, -1),
+        new Vector3Int(-1, 0, 1),
+        new Vector3Int(-1, 0, -1),
+        new Vector3Int(0, 1, 1),
+        new Vector3Int(0, 1, -1),
+        new Vector3Int(0, -1, 1),
+        new Vector3Int(0, -1, -1),
+        new Vector3Int(1, 1, 1),
+        new Vector3Int(1, 1, -1),
+        new Vector3Int(1, -1, 1),
+        new Vector3Int(1, -1, -1),
+        new Vector3Int(-1, 1, 1),
+        new Vector3Int(-1, 1, -1),
+        new Vector3Int(-1, -1, 1),
+        new Vector3Int(-1, -1, -1),
+    };
+
         if (useDiagonal)
         {
-
             // Combine the regular and diagonal directions
             directions = directions.Concat(diagonalDirections).ToArray();
         }
 
         ChunkManager chunkManager = ChunkManager.Instance;
 
-        foreach (Vector3Int direction in directions)
+        // Use Parallel.ForEach to process directions in parallel
+        Parallel.ForEach(directions, direction =>
         {
-
-            IsDiagonal.Add(diagonalDirections.Contains(direction));
+            bool isDiagonal = diagonalDirections.Contains(direction);
 
             Chunk neighboringChunk = chunkManager.GetNeighboringChunk(currentPos, direction.x, direction.y, direction.z);
             if (neighboringChunk != null)
             {
-                neighboringChunks.Add(neighboringChunk);
+                lock (neighboringChunks) // Ensure thread-safe access to neighboringChunks list
+                {
+                    neighboringChunks.Add(neighboringChunk);
+                    IsDiagonal.Add(isDiagonal);
+                }
             }
-        }
+        });
 
         return (neighboringChunks.ToArray(), IsDiagonal.ToArray());
     }
+
+
 
 
 

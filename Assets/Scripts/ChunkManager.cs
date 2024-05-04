@@ -466,13 +466,14 @@ public class ChunkManager : MonoBehaviour
     {
         Vector3Int neighboringChunkPosition = currentChunkPosition + new Vector3Int(dx, dy, dz);
 
-        if (activeChunks.ContainsKey(neighboringChunkPosition))
+        try
         {
-            Chunk neighboringChunk = activeChunks[neighboringChunkPosition];
-            return neighboringChunk;
+            return activeChunks[neighboringChunkPosition];
         }
-
-        return null;
+        catch
+        {
+            return null;
+        }
     }
 
 

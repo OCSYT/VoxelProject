@@ -416,6 +416,15 @@ MonoBehaviour:
   - Name: Water
     Value: 16
     Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: R
+    Value: 97
+    Light: {r: 1, g: 0, b: 0, a: 1}
+  - Name: G
+    Value: 161
+    Light: {r: 0, g: 1, b: 0, a: 1}
+  - Name: B
+    Value: 225
+    Light: {r: 0, g: 0, b: 1, a: 1}
   seed: 1743733926
   ChunkBorderPrefab: {fileID: 6104295362550119401, guid: b2a1684a706b6a845ade531b06670eda,
     type: 3}

@@ -3,9 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Unity.Mathematics;
 using Unity.VisualScripting;
 using UnityEngine;
-
 
 
 public class ChunkManager : MonoBehaviour
@@ -102,6 +102,14 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
+
+
+    private float GetWaitTime()
+    {
+        return .05f;
+    }
+
+
     IEnumerator GenerateChunks()
     {
 
@@ -165,9 +173,10 @@ public class ChunkManager : MonoBehaviour
                 activeChunks.Add(chunkPosition, chunk);
                 activeChunksObj.Add(chunkPosition, newChunk);
             }
-            yield return null;
+            yield return new WaitForSeconds(GetWaitTime());
         }
     }
+
     public float waterLevel = 10;
     public float height = 25;
     public float scale = 0.01f;

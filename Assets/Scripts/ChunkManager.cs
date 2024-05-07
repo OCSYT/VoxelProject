@@ -128,18 +128,11 @@ public class ChunkManager : MonoBehaviour
                     Vector3 chunkCenter = chunkPosition * ChunkSize + new Vector3(ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f);
                     Vector3 cameraToChunk = chunkCenter - target.position;
 
-                    // Calculate the dot product between camera's forward direction and vector to chunk
-                    float dotProduct = Vector3.Dot(target.forward, cameraToChunk.normalized);
+                    float distance = cameraToChunk.magnitude;
 
-                    // Check if chunk is in front of or directly below the camera
-                    if (dotProduct > 0 || y == -renderDistance)
+                    if (distance < renderDistance * ChunkSize)
                     {
-                        float distance = cameraToChunk.magnitude;
-
-                        if (distance < renderDistance * ChunkSize)
-                        {
-                            sortedChunkPositions.Add(chunkPosition);
-                        }
+                        sortedChunkPositions.Add(chunkPosition);
                     }
                 }
             }

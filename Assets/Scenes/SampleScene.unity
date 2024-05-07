@@ -17,7 +17,7 @@ RenderSettings:
   m_Fog: 1
   m_FogColor: {r: 0, g: 0.37012935, b: 1, a: 1}
   m_FogMode: 3
-  m_FogDensity: 0.005
+  m_FogDensity: 0.001
   m_LinearFogStart: 0
   m_LinearFogEnd: 300
   m_AmbientSkyColor: {r: 0.212, g: 0.227, b: 0.259, a: 1}
@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.064758085, g: 0.45678788, b: 0.78320104, a: 1}
+  m_IndirectSpecularColor: {r: 0.023757935, g: 0.1676026, b: 0.28735206, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -481,7 +481,7 @@ MonoBehaviour:
   seed: 1743733926
   ChunkBorderPrefab: {fileID: 6104295362550119401, guid: b2a1684a706b6a845ade531b06670eda,
     type: 3}
-  ChunkBorders: 1
+  ChunkBorders: 0
   renderDistance: 8
   target: {fileID: 156053372}
   ChunkSize: 16

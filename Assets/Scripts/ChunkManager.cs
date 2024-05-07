@@ -41,6 +41,7 @@ public class ChunkManager : MonoBehaviour
     public Dictionary<Vector3Int, GameObject> activeChunksObj = new Dictionary<Vector3Int, GameObject>();
     private Coroutine generateChunksCoroutine;
     private Vector3 previousTargetPosition;
+    private float previousTargetRotation;
     private Dictionary<Vector3Int, byte[,,]> chunkCache = new Dictionary<Vector3Int, byte[,,]>();
     public Dictionary<string, byte> BlockList = new Dictionary<string, byte>();
     public Dictionary<string, byte[]> BlockListLight = new Dictionary<string, byte[]>();
@@ -59,6 +60,7 @@ public class ChunkManager : MonoBehaviour
             Instance = this;
         }
         previousTargetPosition = target.position;
+        previousTargetRotation = Mathf.Round(target.rotation.eulerAngles.y);
         generateChunksCoroutine = StartCoroutine(GenerateChunks());
     }
 
@@ -88,7 +90,7 @@ public class ChunkManager : MonoBehaviour
         UpdateChunks();
 
 
-        if (Vector3.Distance(target.position, previousTargetPosition) > ChunkSize)
+        if (Vector3.Distance(target.position, previousTargetPosition) > ChunkSize || previousTargetRotation != Mathf.Round(target.rotation.eulerAngles.y))
         {
             if (generateChunksCoroutine != null)
             {
@@ -99,15 +101,11 @@ public class ChunkManager : MonoBehaviour
 
 
             previousTargetPosition = target.position;
+            previousTargetRotation = Mathf.Round(target.rotation.eulerAngles.y);
         }
     }
 
 
-
-    private float GetWaitTime()
-    {
-        return .05f;
-    }
 
 
     IEnumerator GenerateChunks()
@@ -127,21 +125,34 @@ public class ChunkManager : MonoBehaviour
                         Mathf.FloorToInt(target.position.z / ChunkSize) + z
                     );
 
-                    float distance = Vector3.Distance(target.position, chunkPosition * ChunkSize);
+                    Vector3 chunkCenter = chunkPosition * ChunkSize + new Vector3(ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f);
+                    Vector3 cameraToChunk = chunkCenter - target.position;
 
-                    if (distance < renderDistance * ChunkSize)
+                    // Calculate the dot product between camera's forward direction and vector to chunk
+                    float dotProduct = Vector3.Dot(target.forward, cameraToChunk.normalized);
+
+                    // Check if chunk is in front of or directly below the camera
+                    if (dotProduct > 0 || y == -renderDistance)
                     {
-                        sortedChunkPositions.Add(chunkPosition);
+                        float distance = cameraToChunk.magnitude;
+
+                        if (distance < renderDistance * ChunkSize)
+                        {
+                            sortedChunkPositions.Add(chunkPosition);
+                        }
                     }
                 }
             }
         }
+
+
         sortedChunkPositions.Sort((a, b) =>
         {
             float distanceA = Vector3.Distance(target.position, a * ChunkSize);
             float distanceB = Vector3.Distance(target.position, b * ChunkSize);
             return distanceA.CompareTo(distanceB);
         });
+
 
         foreach (Vector3Int chunkPosition in sortedChunkPositions)
         {
@@ -160,20 +171,28 @@ public class ChunkManager : MonoBehaviour
                 Chunk chunk = newChunk.AddComponent<Chunk>();
                 chunk.Init(mat, transparent, TransparentBlocks.ToArray(), NoCollisonBlocks.ToArray(), ChunkSize, TextureSize, BlockSize, chunkPosition);
 
-
-                if (!chunkCache.ContainsKey(chunkPosition))
-                {
-                    chunk.SetData(SetTerrain(chunk));
-                }
-                else
-                {
-                    chunk.SetData(chunkCache[chunkPosition]);
-                }
-                chunk.GenerateTerrain();
                 activeChunks.Add(chunkPosition, chunk);
                 activeChunksObj.Add(chunkPosition, newChunk);
+
+                if (chunk)
+                {
+                    if (!chunkCache.ContainsKey(chunkPosition))
+                    {
+                        chunk.SetData(SetTerrain(chunk));
+                    }
+                    else
+                    {
+                        chunk.SetData(chunkCache[chunkPosition]);
+                    }
+                    if (chunk.GetData() != new byte[ChunkSize, ChunkSize, ChunkSize])
+                    {
+                        yield return new WaitForSeconds(Mathf.Max(Time.deltaTime, 0.1f));
+                    }
+
+
+                    chunk.GenerateTerrain();
+                }
             }
-            yield return new WaitForSeconds(GetWaitTime());
         }
     }
 
@@ -207,7 +226,7 @@ public class ChunkManager : MonoBehaviour
 
                     if (voxelPosition.y > ycoord && voxelPosition.y <= waterLevel)
                     {
-                        voxelValue = 16;
+                        voxelValue = BlockList["Water"];
                     }
                     else
                     {
@@ -215,17 +234,17 @@ public class ChunkManager : MonoBehaviour
                         {
                             if(voxelPosition.y == waterLevel)
                             {
-                                voxelValue = 11;
+                                voxelValue = BlockList["Sand"];
                             }
                             else
                             {
                                 if(voxelPosition.y < waterLevel)
                                 {
-                                    voxelValue = 11;
+                                    voxelValue = BlockList["Sand"];
                                 }
                                 else
                                 {
-                                    voxelValue = 1; //grass
+                                    voxelValue = BlockList["Grass"]; //grass
                                 }
                             }
                         }
@@ -233,11 +252,11 @@ public class ChunkManager : MonoBehaviour
                         {
                             if (voxelPosition.y < ycoord)
                             {
-                                voxelValue = 2; //dirt
+                                voxelValue = BlockList["Dirt"]; //dirt
                             }
                             if (voxelPosition.y < ycoord - 4)
                             {
-                                voxelValue = 3; //stone
+                                voxelValue = BlockList["Stone"]; //stone
                             }
                         }
                     }
@@ -253,7 +272,7 @@ public class ChunkManager : MonoBehaviour
             {
                 for (int z = 0; z < ChunkSize; z++)
                 {
-                    if (VoxelData[x, y, z] == 1) // check for grass
+                    if (VoxelData[x, y, z] == BlockList["Grass"]) 
                     {
 
                         if (y + 10 < ChunkSize && x + 2 < ChunkSize && z + 2 < ChunkSize
@@ -262,16 +281,15 @@ public class ChunkManager : MonoBehaviour
                         {
                             for (int i = y + 1; i < y + 4; i++)
                             {
-                                VoxelData[x, i, z] = 7; // add trunk
+                                VoxelData[x, i, z] = BlockList["Oak Log"]; 
                             }
-                            // Add leaves on top
-                            for (int offsetY = y + 4; offsetY < y + 8; offsetY++) // adjust the height range as needed
+                            for (int offsetY = y + 4; offsetY < y + 8; offsetY++)
                             {
                                 for (int offsetX = -2; offsetX <= 2; offsetX++)
                                 {
                                     for (int offsetZ = -2; offsetZ <= 2; offsetZ++)
                                     {
-                                        VoxelData[x + offsetX, offsetY, z + offsetZ] = 8; // assuming 8 is the ID for leaves
+                                        VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Leaves"];
                                     }
                                 }
                             }
@@ -400,11 +418,25 @@ public class ChunkManager : MonoBehaviour
 
             return chunk.GetData()[voxelX, voxelY, voxelZ];
         }
-        else
-        {
-            Debug.LogWarning("Chunk at position " + chunkPosition + " is not active.");
-        }
         return 0;
+    }
+
+
+    public Chunk GetChunk(Vector3 worldPosition)
+    {
+        Vector3Int chunkPosition = new Vector3Int(
+            Mathf.FloorToInt(worldPosition.x / ChunkSize),
+            Mathf.FloorToInt(worldPosition.y / ChunkSize),
+            Mathf.FloorToInt(worldPosition.z / ChunkSize)
+        );
+
+
+        if (activeChunks.ContainsKey(chunkPosition))
+        {
+            Chunk chunk = activeChunks[chunkPosition];
+            return chunk;
+        }
+        return null;
     }
 
 
@@ -495,7 +527,6 @@ public class ChunkManager : MonoBehaviour
             Vector3Int chunkPosition = chunk.Key;
             GameObject chunkObj = chunk.Value;
             float distance = Vector3.Distance(chunkObj.transform.position, target.position);
-
 
             if (distance > renderDistance * ChunkSize)
             {

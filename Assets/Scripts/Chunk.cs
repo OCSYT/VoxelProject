@@ -39,7 +39,7 @@ public class Chunk : MonoBehaviour
     private Material _Material;
     private float TextureSize = 256;
     private float BlockSize = 16;
-    private Vector3Int currentPos;
+    public Vector3Int currentPos;
     private Transform Main;
     private Transform TransparentObj;
     private Transform NoCollisionObj;
@@ -385,7 +385,6 @@ public class Chunk : MonoBehaviour
                     }
                 });
             }
-            await Task.CompletedTask;
         });
         task.Wait();
 
@@ -472,7 +471,7 @@ public class Chunk : MonoBehaviour
     private void SunLighting(Chunk aboveChunk, Chunk chunk)
     {
         float globalLightValue = ChunkManager.Instance.SkyIntensity;
-        float adjustedDecrement = globalLightValue / 15;
+        byte adjustedDecrement = (byte)Mathf.RoundToInt(globalLightValue / 15);
 
         byte[,,] aboveChunkData = aboveChunk != null ? aboveChunk.GetData() : new byte[ChunkSize, ChunkSize, ChunkSize];
         byte[,,] aboveLightDataSun = aboveChunk != null ? aboveChunk.GetLightDataSun() : new byte[ChunkSize, ChunkSize, ChunkSize];
@@ -499,41 +498,27 @@ public class Chunk : MonoBehaviour
                     }
                 }
 
+
                 if (isEmpty)
                 {
                     lightValueSun = (byte)globalLightValue;
                 }
 
-                float gradientValue = lightValueSun;
+                byte gradientValue = lightValueSun;
 
                 for (int y = ChunkSize - 1; y >= 0; y--)
                 {
-                    if (isEmpty)
+                    byte voxel = chunk.VoxelData[x, y, z];
+                    if (voxel != BlockList["Air"] && !ReturnType(voxel, TransparentIDs))
                     {
-                        chunk.LightDataSun[x, y, z] = lightValueSun;
+                        gradientValue = (byte)Mathf.Clamp(gradientValue - adjustedDecrement, 0, 15);
+                        chunk.LightDataSun[x, y, z] = gradientValue;
                     }
                     else
                     {
-                        byte voxel = chunk.VoxelData[x, y, z];
-                        if (voxel != BlockList["Air"] && !ReturnType(voxel, TransparentIDs))
-                        {
-                            gradientValue = Mathf.Clamp(gradientValue - adjustedDecrement, 0, 15);
-                            chunk.LightDataSun[x, y, z] = (byte)Mathf.RoundToInt(gradientValue);
-                        }
+                        chunk.LightDataSun[x, y, z] = gradientValue;
                     }
-                }
 
-                if (isEmpty)
-                {
-                    for (int y = 0; y < ChunkSize; y++)
-                    {
-                        byte voxel = chunk.VoxelData[x, y, z];
-                        if (voxel != BlockList["Air"] && !ReturnType(voxel, TransparentIDs))
-                        {
-                            gradientValue = Mathf.Clamp(chunk.LightDataSun[x, y, z] - adjustedDecrement, 0, 15);
-                            chunk.LightDataSun[x, y, z] = (byte)Mathf.RoundToInt(gradientValue);
-                        }
-                    }
                 }
             }
         });
@@ -608,15 +593,93 @@ public class Chunk : MonoBehaviour
 
 
 
+    public void BlockChunkUpdate()
+    {
+        Vector3 chunkCornerWorldPos = transform.position;
+        Parallel.For(0, ChunkSize, x =>
+        {
+            for (int y = 0; y < ChunkSize; y++)
+            {
+                for (int z = 0; z < ChunkSize; z++)
+                {
+                    Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
+
+                    // Check if current voxel is below water level and air
+                    if (voxelPosition.y <= ChunkManager.Instance.waterLevel && VoxelData[x, y, z] == BlockList["Air"])
+                    {
+                        // Check if any neighboring voxel is water
+                        bool hasWaterNeighbor = CheckForWaterNeighbor(x, y, z);
+
+                        // Fill with water only if there's a water neighbor
+                        if (hasWaterNeighbor)
+                        {
+                            VoxelData[x, y, z] = BlockList["Water"];
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    private bool CheckForWaterNeighbor(int x, int y, int z)
+    {
+        Vector3Int[] directions = new Vector3Int[]
+        {
+                    new Vector3Int(-1, 0, 0),   // Left
+                    new Vector3Int(1, 0, 0),    // Right
+                    new Vector3Int(0, -1, 0),   // Bottom
+                    new Vector3Int(0, 1, 0),    // Top
+                    new Vector3Int(0, 0, -1),   // Back
+                    new Vector3Int(0, 0, 1)     // Front
+        };
+
+        bool found = false;
+        Parallel.For(0, directions.Length, i =>
+        {
+            Vector3Int direction = directions[i];
+
+
+            int neighborX = x + direction.x;
+            int neighborY = y + direction.y;
+            int neighborZ = z + direction.z;
+            if (neighborX < 0 || neighborX >= ChunkSize ||
+                neighborY < 0 || neighborY >= ChunkSize ||
+                neighborZ < 0 || neighborZ >= ChunkSize)
+            {
+                int neighborChunkX = (x + direction.x + ChunkSize) % ChunkSize;
+                int neighborChunkY = (y + direction.y + ChunkSize) % ChunkSize;
+                int neighborChunkZ = (z + direction.z + ChunkSize) % ChunkSize;
+
+                Chunk chunk = ChunkManager.Instance.GetNeighboringChunk(currentPos, direction.x, direction.y, direction.z);
+                if (chunk)
+                {
+                    if (chunk.GetData()[neighborChunkX, neighborChunkY, neighborChunkZ] == BlockList["Water"])
+                    {
+                        found = true;
+                    }
+                }
+            }
+            else
+            {
+                if (VoxelData[neighborX, neighborY, neighborZ] == BlockList["Water"])
+                {
+                    found = true;
+                }
+            }
+        });
+
+        return found;
+    }
+
+
 
     private bool isGeneratingMesh = false;
-
-
 
     public async void GenerateMesh(bool updateNeighbors)
     {
         if(isGeneratingMesh) return;
         isGeneratingMesh = true;
+                BlockChunkUpdate();
 
         List<Vector3> vertices = new List<Vector3>();
         List<int> triangles = new List<int>();

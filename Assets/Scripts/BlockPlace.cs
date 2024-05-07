@@ -7,9 +7,13 @@ public class BlockPlace : MonoBehaviour
     public float Dist = 25;
     public List<string> IgnoreBlocks = new List<string> { "air", "water", "lava" };
     public List<Block> blockList; // List of available blocks to place
+    public string LookingAt = "";
+    public Vector3 ChunkPosition;
     private int selectedBlockIndex = 0;
+    private ChunkManager chunkManager;
     void Start()
     {
+        chunkManager = ChunkManager.Instance;
         if (blockList == null)
         {
             blockList = new List<Block>();
@@ -21,7 +25,17 @@ public class BlockPlace : MonoBehaviour
         }
     }
 
-    // Update is called once per frame
+    private string FindKeyFromValue(Dictionary<string, byte> dictionary, byte value)
+    {
+        foreach (var kvp in dictionary)
+        {
+            if (kvp.Value == value)
+            {
+                return kvp.Key;
+            }
+        }
+        return null;
+    }
     void Update()
     {
 
@@ -35,6 +49,24 @@ public class BlockPlace : MonoBehaviour
         {
             selectedBlockIndex = (selectedBlockIndex - 1 + blockList.Count) % blockList.Count;
         }
+
+
+        Chunk currentChunk = chunkManager.GetChunk(transform.position);
+        if (currentChunk != null) {
+            ChunkPosition = currentChunk.currentPos;
+        }
+        RaycastHit CheckHit;
+        Ray CheckRay = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(CheckRay, out CheckHit, Dist))
+        {
+            Vector3 targetPosition = CheckHit.point - CheckHit.normal / 2f;
+            LookingAt = FindKeyFromValue(chunkManager.BlockList, chunkManager.GetVoxelPosition(targetPosition));
+        }
+        else
+        {
+            LookingAt = "Air";
+        }
+
 
         if (Input.GetMouseButtonDown(0))
         {

@@ -46,23 +46,12 @@ public class Chunk : MonoBehaviour
     private Transform NoCollisionObjTransparent;
     private Coroutine LightingCoroutine;
     private bool LightingGenerating;
-    private int currentSunLevel;
     private Dictionary<string, byte> BlockList = new Dictionary<string, byte>();
     private Dictionary<string, byte[]> BlockListLight = new Dictionary<string, byte[]>();
     void Start()
     {
-        currentSunLevel = ChunkManager.Instance.SkyIntensity;
-        InvokeRepeating("Tick", 0, 1f);
     }
 
-    void Tick()
-    {
-        if (ChunkManager.Instance.SkyIntensity != currentSunLevel)
-        {
-            currentSunLevel = ChunkManager.Instance.SkyIntensity;
-            GenerateLighting(true, false);
-        }
-    }
 
     public void Init(Material mat, Material transparentMat, byte[] transparent, byte[] nocollision, int _ChunkSize, float _TextureSize, float _BlockSize, Vector3Int Position)
     {
@@ -596,6 +585,8 @@ public class Chunk : MonoBehaviour
     public void BlockChunkUpdate()
     {
         Vector3 chunkCornerWorldPos = transform.position;
+
+        // Forward pass
         Parallel.For(0, ChunkSize, x =>
         {
             for (int y = 0; y < ChunkSize; y++)
@@ -619,7 +610,33 @@ public class Chunk : MonoBehaviour
                 }
             }
         });
+
+        // Reverse pass
+        Parallel.For(0, ChunkSize, x =>
+        {
+            for (int y = ChunkSize - 1; y >= 0; y--)
+            {
+                for (int z = 0; z < ChunkSize; z++)
+                {
+                    Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
+
+                    // Check if current voxel is below water level and air
+                    if (voxelPosition.y <= ChunkManager.Instance.waterLevel && VoxelData[x, y, z] == BlockList["Air"])
+                    {
+                        // Check if any neighboring voxel is water
+                        bool hasWaterNeighbor = CheckForWaterNeighbor(x, y, z);
+
+                        // Fill with water only if there's a water neighbor
+                        if (hasWaterNeighbor)
+                        {
+                            VoxelData[x, y, z] = BlockList["Water"];
+                        }
+                    }
+                }
+            }
+        });
     }
+
 
     private bool CheckForWaterNeighbor(int x, int y, int z)
     {

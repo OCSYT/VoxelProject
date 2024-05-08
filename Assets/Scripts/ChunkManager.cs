@@ -62,6 +62,9 @@ public class ChunkManager : MonoBehaviour
         previousTargetPosition = target.position;
         previousTargetRotation = Mathf.Round(target.rotation.eulerAngles.y);
         generateChunksCoroutine = StartCoroutine(GenerateChunks());
+
+        float SkyValue = 15 - (Mathf.Sin(GameTime * Daylength / 500) * 15);
+        SkyIntensity = Mathf.RoundToInt(SkyValue);
     }
 
     private void OnDestroy()
@@ -72,11 +75,41 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
+    IEnumerator UpdateChunkLighting()
+    {
+        List<Vector3Int> keys = new List<Vector3Int>(activeChunks.Keys);
+
+        foreach (Vector3Int position in keys)
+        {
+            if (activeChunks.ContainsKey(position))
+            {
+                Chunk chunk = activeChunks[position];
+                if (chunk != null)
+                {
+                    if (chunk.GetData() != new byte[ChunkSize, ChunkSize, ChunkSize])
+                    {
+                        chunk.GenerateLighting(true, false);
+                        yield return null;
+                    }
+                }
+            }
+        }
+    }
+
+
     void Update()
     {
         GameTime += Time.deltaTime;
         float SkyValue = 15 - (Mathf.Sin(GameTime * Daylength / 500) * 15);
-        SkyIntensity = Mathf.RoundToInt(SkyValue);
+        int newSkyIntensity = Mathf.RoundToInt(SkyValue);
+
+        if(newSkyIntensity != SkyIntensity)
+        {
+            StartCoroutine(UpdateChunkLighting());
+        }
+
+        SkyIntensity = newSkyIntensity;
+
         if (SkyShader)
         {
             SkyShader.SetFloat("_Sky", SkyValue / 15);
@@ -86,6 +119,7 @@ public class ChunkManager : MonoBehaviour
         {
             Instance = this;
         }
+
 
         UpdateChunks();
 
@@ -169,21 +203,21 @@ public class ChunkManager : MonoBehaviour
 
                 if (chunk)
                 {
+                    byte[,,] NewData = new byte[ChunkSize, ChunkSize, ChunkSize]; 
                     if (!chunkCache.ContainsKey(chunkPosition))
                     {
-                        chunk.SetData(SetTerrain(chunk));
+                        NewData = SetTerrain(chunk);
                     }
                     else
                     {
-                        chunk.SetData(chunkCache[chunkPosition]);
+                        NewData = chunkCache[chunkPosition];
                     }
-                    if (chunk.GetData() != new byte[ChunkSize, ChunkSize, ChunkSize])
-                    {
-                        yield return new WaitForSeconds(Mathf.Max(Time.deltaTime, 0.1f));
-                    }
-
-
+                    chunk.SetData(NewData);
                     chunk.GenerateTerrain();
+                    if (NewData != new byte[ChunkSize, ChunkSize, ChunkSize])
+                    {
+                        yield return new WaitForSeconds(.1f);
+                    }
                 }
             }
         }

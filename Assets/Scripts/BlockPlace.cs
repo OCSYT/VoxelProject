@@ -91,9 +91,10 @@ public class BlockPlace : MonoBehaviour
         if (currentChunk != null) {
             ChunkPosition = currentChunk.currentPos;
         }
+
+
         RaycastHit CheckHit;
-        Ray CheckRay = Camera.main.ScreenPointToRay(Input.mousePosition);
-        if (Physics.Raycast(CheckRay, out CheckHit, Dist, ~ignore))
+        if (Physics.Raycast(player.playerCamera.transform.position, player.playerCamera.transform.forward, out CheckHit, Dist, ~ignore))
         {
             Vector3 targetPosition = CheckHit.point - CheckHit.normal / 2f;
 
@@ -123,10 +124,9 @@ public class BlockPlace : MonoBehaviour
         if (Input.GetMouseButtonDown(0))
         {
             RaycastHit hit;
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
             // Perform a raycast
-            if (Physics.Raycast(ray, out hit, Dist, ~ignore))
+            if (Physics.Raycast(player.playerCamera.transform.position, player.playerCamera.transform.forward, out hit, Dist, ~ignore))
             {
 
                 Vector3 targetPosition = hit.point - hit.normal / 2f;
@@ -136,10 +136,9 @@ public class BlockPlace : MonoBehaviour
         if (Input.GetMouseButtonDown(1))
         {
             RaycastHit hit;
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
             // Perform a raycast
-            if (Physics.Raycast(ray, out hit, Dist, ~ignore))
+            if (Physics.Raycast(player.playerCamera.transform.position, player.playerCamera.transform.forward, out hit, Dist, ~ignore))
             {
 
                 Vector3 targetPosition = hit.point + hit.normal / 2f;

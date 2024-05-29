@@ -1,10 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI; 
+using UnityEngine.UI;
 using TMPro;
 using UnityEngine.SceneManagement;
-using System;
 
 [RequireComponent(typeof(CharacterController))]
 public class Player : MonoBehaviour
@@ -17,8 +16,10 @@ public class Player : MonoBehaviour
     public float playerSpeed = 2.0f;
     public float jumpHeight = 1.0f;
     public float gravityValue = -9.81f;
-
+    private int camVal;
     public Camera playerCamera;
+    public Camera playerCameraBack;
+    public Camera playerCameraFront;
     public float mouseSensitivity = 100.0f;
     private float xRotation = 0f;
     public LayerMask ignore;
@@ -38,13 +39,14 @@ public class Player : MonoBehaviour
 
     public GameObject pauseMenuUI;
     public GameObject LoadingScreen;
+    public GameObject HandUI;
     public Slider RenderDistanceSlider;
     public Slider SensitivitySlider;
     public TextMeshProUGUI RenderDistanceText;
     public TextMeshProUGUI SensitivityText;
+    public Toggle graphicsToggle;
 
     public bool isPaused = false;
-
 
     private void Start()
     {
@@ -55,6 +57,15 @@ public class Player : MonoBehaviour
         StartCoroutine(WaitForInit());
         RenderDistanceSlider.value = PlayerPrefs.GetInt("RenderDistance", 8);
         SensitivitySlider.value = PlayerPrefs.GetFloat("Sensitivity", 100);
+
+        // Set the default graphics settings to high
+        graphicsToggle.isOn = true;
+        SetGraphicsSettings(graphicsToggle.isOn);
+
+        // Add listener to the toggle
+        graphicsToggle.onValueChanged.AddListener(delegate {
+            SetGraphicsSettings(graphicsToggle.isOn);
+        });
     }
 
     IEnumerator WaitForInit()
@@ -85,8 +96,6 @@ public class Player : MonoBehaviour
         if (AllowMovement == false || AllowMovementInit == false) return;
         controller.enabled = true;
 
-
-
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             if (isPaused)
@@ -99,7 +108,38 @@ public class Player : MonoBehaviour
             }
         }
 
-
+        if (Input.GetKeyDown(KeyCode.F5) && !isPaused)
+        {
+            if (camVal != 2)
+            {
+                camVal++;
+            }
+            else
+            {
+                camVal = 0;
+            }
+            if (camVal == 0)
+            {
+                playerCamera.enabled = true;
+                playerCameraBack.enabled = false;
+                playerCameraFront.enabled = false;
+                HandUI.SetActive(true);
+            }
+            if (camVal == 1)
+            {
+                playerCamera.enabled = false;
+                playerCameraBack.enabled = true;
+                playerCameraFront.enabled = false;
+                HandUI.SetActive(false);
+            }
+            if (camVal == 2)
+            {
+                playerCamera.enabled = false;
+                playerCameraBack.enabled = false;
+                playerCameraFront.enabled = true;
+                HandUI.SetActive(false);
+            }
+        }
 
         if (AllowMovement == false)
         {
@@ -112,14 +152,17 @@ public class Player : MonoBehaviour
 
         Move();
         MouseLook();
+    }
 
+    private void LateUpdate()
+    {
         float playerVelocityAmount = new Vector3(playerVelocity.x, 0, playerVelocity.z).magnitude;
         float MoveAmount = Mathf.Clamp01(Mathf.Abs(Mathf.RoundToInt(playerVelocityAmount)));
 
         if (MoveAmount == 1)
         {
             Anim.SetBool("Moving", true);
-            MovementDotY = (Vector3.Dot(transform.right, playerVelocity)) * 5;
+            MovementDotY = (Vector3.Dot((transform.right), (playerVelocity))) * 5;
         }
         else
         {
@@ -128,7 +171,7 @@ public class Player : MonoBehaviour
 
         Head.transform.rotation = Quaternion.Euler(playerCamera.transform.eulerAngles.z, playerCamera.transform.eulerAngles.y + 90, playerCamera.transform.eulerAngles.x);
         Hand.transform.localPosition = new Vector3(Mathf.Sin(Time.time * playerSpeed * HandAmountX * MoveAmount) * HandAmount, Mathf.Sin(Time.time * playerSpeed * HandAmountY * MoveAmount) * HandAmount, 0);
-        Anim.transform.localRotation = Quaternion.Euler(0, MovementDotY + 90, 0);
+        Anim.transform.localRotation = Quaternion.Slerp(Anim.transform.localRotation, Quaternion.Euler(0, MovementDotY + 90, 0), 15 * Time.deltaTime);
     }
 
     void MouseLook()
@@ -146,13 +189,14 @@ public class Player : MonoBehaviour
     void Move()
     {
         RaycastHit hit;
-        groundedPlayer = Physics.SphereCast(transform.position, 0.4f, -Vector3.up, out hit, (1.1f - 0.4f), ~ignore);
+        float radius = .1f;
+        groundedPlayer = Physics.SphereCast(transform.position, radius, -Vector3.up, out hit, (1.1f - radius), ~ignore);
         if (groundedPlayer && playerVelocity.y < 0)
         {
             playerVelocity.y = 0f;
         }
 
-        Vector3 move = isPaused ? Vector3.zero : transform.right * Input.GetAxis("Horizontal") + transform.forward * Input.GetAxis("Vertical");
+        Vector3 move = isPaused ? Vector3.zero : transform.right * Input.GetAxisRaw("Horizontal") + transform.forward * Input.GetAxisRaw("Vertical");
         playerVelocity.x = move.x * playerSpeed;
         playerVelocity.z = move.z * playerSpeed;
 
@@ -183,5 +227,21 @@ public class Player : MonoBehaviour
     {
         chunkManager.SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
         SceneManager.LoadScene(0);
+    }
+
+    void SetGraphicsSettings(bool highGraphics)
+    {
+        Light mainLight = GameObject.FindObjectOfType<Light>();
+        if (mainLight != null)
+        {
+            if (highGraphics)
+            {
+                mainLight.shadows = LightShadows.Soft;
+            }
+            else
+            {
+                mainLight.shadows = LightShadows.None;
+            }
+        }
     }
 }

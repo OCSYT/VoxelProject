@@ -59,7 +59,7 @@ public class Player : MonoBehaviour
         SensitivitySlider.value = PlayerPrefs.GetFloat("Sensitivity", 100);
 
         // Set the default graphics settings to high
-        graphicsToggle.isOn = true;
+        graphicsToggle.isOn = PlayerPrefs.GetInt("Graphics", 1) == 1;
         SetGraphicsSettings(graphicsToggle.isOn);
 
         // Add listener to the toggle
@@ -169,9 +169,9 @@ public class Player : MonoBehaviour
             Anim.SetBool("Moving", false);
         }
 
-        Head.transform.rotation = Quaternion.Euler(playerCamera.transform.eulerAngles.z, playerCamera.transform.eulerAngles.y + 90, playerCamera.transform.eulerAngles.x);
         Hand.transform.localPosition = new Vector3(Mathf.Sin(Time.time * playerSpeed * HandAmountX * MoveAmount) * HandAmount, Mathf.Sin(Time.time * playerSpeed * HandAmountY * MoveAmount) * HandAmount, 0);
         Anim.transform.localRotation = Quaternion.Slerp(Anim.transform.localRotation, Quaternion.Euler(0, MovementDotY + 90, 0), 15 * Time.deltaTime);
+        Head.transform.rotation = Quaternion.Euler(playerCamera.transform.eulerAngles.z, playerCamera.transform.eulerAngles.y + 90, playerCamera.transform.eulerAngles.x);
     }
 
     void MouseLook()
@@ -231,6 +231,7 @@ public class Player : MonoBehaviour
 
     void SetGraphicsSettings(bool highGraphics)
     {
+        PlayerPrefs.SetInt("Graphics", highGraphics ? 1 : 0);
         Light mainLight = GameObject.FindObjectOfType<Light>();
         if (mainLight != null)
         {

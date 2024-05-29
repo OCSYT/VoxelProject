@@ -1,23 +1,163 @@
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
-using Unity.Mathematics;
-using Unity.VisualScripting;
 using UnityEngine;
-
+using System.Xml.Serialization;
+using Newtonsoft.Json;
 
 public class ChunkManager : MonoBehaviour
 {
+
+    public AnimationCurve terrainCurve;
+
+
+    [Serializable]
+    public class SerializableVector3Int
+    {
+        public int x, y, z;
+        public SerializableVector3Int() { }
+
+        public SerializableVector3Int(int x, int y, int z)
+        {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        public SerializableVector3Int(Vector3Int vector)
+        {
+            this.x = vector.x;
+            this.y = vector.y;
+            this.z = vector.z;
+        }
+
+        public Vector3Int ToVector3Int()
+        {
+            return new Vector3Int(x, y, z);
+        }
+    }
+
+    [Serializable]
+    public class ChunkData
+    {
+        public SerializableVector3Int Position;
+        public List<byte> Data;
+
+        public ChunkData() { }
+        public ChunkData(Vector3Int position, byte[,,] data)
+        {
+            Position = new SerializableVector3Int(position);
+
+            Data = new List<byte>();
+            int sizeX = data.GetLength(0);
+            int sizeY = data.GetLength(1);
+            int sizeZ = data.GetLength(2);
+            for (int x = 0; x < sizeX; x++)
+            {
+                for (int y = 0; y < sizeY; y++)
+                {
+                    for (int z = 0; z < sizeZ; z++)
+                    {
+                        Data.Add(data[x, y, z]);
+                    }
+                }
+            }
+        }
+    }
+
+    [Serializable]
+    public class SaveData
+    {
+        public int Seed;
+        public List<ChunkData> Chunks;
+
+        public SaveData() { }
+        public SaveData(int seed, Dictionary<Vector3Int, byte[,,]> chunkCache)
+        {
+            Seed = seed;
+            Chunks = chunkCache.Select(kvp => new ChunkData(kvp.Key, kvp.Value)).ToList();
+        }
+    }
+
+    public void SaveGame(string filePath)
+    {
+        SaveData saveData = new SaveData(seed, chunkCache);
+
+        // Serialize the SaveData object to JSON
+        string jsonString = JsonConvert.SerializeObject(saveData, Formatting.Indented);
+
+        // Write the JSON string to the file
+        File.WriteAllText(filePath, jsonString);
+
+        Debug.Log("Game saved successfully!");
+    }
+
+    public void LoadGame(string filePath)
+    {
+        if (File.Exists(filePath))
+        {
+            // Read the JSON string from the file
+            string jsonString = File.ReadAllText(filePath);
+
+            // Deserialize the JSON string to a SaveData object
+            SaveData saveData = JsonConvert.DeserializeObject<SaveData>(jsonString);
+
+            // Restore seed
+            seed = saveData.Seed;
+
+            // Clear current chunks
+            foreach (var chunkPosition in activeChunksObj.Keys.ToList())
+            {
+                Destroy(activeChunksObj[chunkPosition]);
+            }
+            activeChunks.Clear();
+            activeChunksObj.Clear();
+
+            // Load chunk data
+            chunkCache = saveData.Chunks.ToDictionary(
+                chunk => chunk.Position.ToVector3Int(),
+                chunk => ConvertTo3DArray(chunk.Data, ChunkSize, ChunkSize, ChunkSize)
+            );
+
+            // Regenerate chunks based on loaded data
+            foreach (var chunk in chunkCache.Keys)
+            {
+                CreateChunk(chunk);
+            }
+
+            Debug.Log("Game loaded successfully!");
+        }
+        else
+        {
+            Debug.LogError("Save file not found!");
+        }
+    }
+
+
+
+
+
     [Serializable]
     public class Block
     {
         public string Name = "NewBlock";
         public byte Value = 0;
+        public int FrontFace = 0;
+        public int BackFace = 0;
+        public int LeftFace = 0;
+        public int RightFace = 0;
+        public int TopFace = 0;
+        public int BottomFace = 0;
+
+        [ColorUsage(true, true)]
         public Color Light = Color.black;
     }
-
     public List<Block> Blocks = new List<Block>();
 
     public int seed = System.Guid.NewGuid().GetHashCode();
@@ -32,27 +172,30 @@ public class ChunkManager : MonoBehaviour
     public Material transparent;
     public List<byte> NoCollisonBlocks;
     public List<byte> TransparentBlocks;
-    public int SkyIntensity = 15;
     public float Daylength = 1;
     public float GameTime = 0;
-    public Material SkyShader;
     public static ChunkManager Instance { get; private set; }
     public Dictionary<Vector3Int, Chunk> activeChunks = new Dictionary<Vector3Int, Chunk>();
     public Dictionary<Vector3Int, GameObject> activeChunksObj = new Dictionary<Vector3Int, GameObject>();
-    private Coroutine generateChunksCoroutine;
     private Vector3 previousTargetPosition;
     private float previousTargetRotation;
     private Dictionary<Vector3Int, byte[,,]> chunkCache = new Dictionary<Vector3Int, byte[,,]>();
     public Dictionary<string, byte> BlockList = new Dictionary<string, byte>();
-    public Dictionary<string, byte[]> BlockListLight = new Dictionary<string, byte[]>();
-
+    public Dictionary<byte, Color> BlockListLight = new Dictionary<byte, Color>();
+    public Dictionary<byte, int[]> BlockFaces = new Dictionary<byte, int[]>();
+    private Light DirectionalLight;
+    public Color AmbientColor;
+    public float MinimumAmbient;
+    public int IgnoreLayer;
+    private ConcurrentQueue<Vector3Int> chunksToCreate = new ConcurrentQueue<Vector3Int>();
 
     void Awake()
     {
         foreach (var block in Blocks)
         {
             BlockList.Add(block.Name, block.Value);
-            BlockListLight.Add(block.Name, new byte[] { (byte)(block.Light.r * 15), (byte)(block.Light.g * 15), (byte)(block.Light.b * 15) });
+            BlockListLight.Add(block.Value, block.Light);
+            BlockFaces.Add(block.Value, new int[] { block.FrontFace, block.BackFace, block.LeftFace, block.RightFace,block.TopFace, block.BottomFace });
         }
 
         if (Instance == null)
@@ -61,59 +204,130 @@ public class ChunkManager : MonoBehaviour
         }
         previousTargetPosition = target.position;
         previousTargetRotation = Mathf.Round(target.rotation.eulerAngles.y);
-        generateChunksCoroutine = StartCoroutine(GenerateChunks());
-
-        float SkyValue = 15 - (Mathf.Sin(GameTime * Daylength / 500) * 15);
-        SkyIntensity = Mathf.RoundToInt(SkyValue);
+        DirectionalLight = GameObject.FindObjectOfType<Light>();
+        InvokeRepeating("GenerateChunkUpdate", 0, .1f);
     }
 
-    private void OnDestroy()
+    private byte[,,] ConvertTo3DArray(List<byte> data, int sizeX, int sizeY, int sizeZ)
     {
-        if (SkyShader)
+        byte[,,] result = new byte[sizeX, sizeY, sizeZ];
+        int index = 0;
+        for (int x = 0; x < sizeX; x++)
         {
-            SkyShader.SetFloat("_Sky", 1);
-        }
-    }
-
-    IEnumerator UpdateChunkLighting()
-    {
-        List<Vector3Int> keys = new List<Vector3Int>(activeChunks.Keys);
-
-        foreach (Vector3Int position in keys)
-        {
-            if (activeChunks.ContainsKey(position))
+            for (int y = 0; y < sizeY; y++)
             {
-                Chunk chunk = activeChunks[position];
-                if (chunk != null)
+                for (int z = 0; z < sizeZ; z++)
                 {
-                    if (chunk.GetData() != new byte[ChunkSize, ChunkSize, ChunkSize])
-                    {
-                        chunk.GenerateLighting(true, false);
-                        yield return null;
-                    }
+                    result[x, y, z] = data[index++];
                 }
             }
         }
+        return result;
     }
 
 
+
+    bool cancelledGeneration = false;
+    async void GenerateChunkUpdate()
+    {
+        Vector3 targetPosition = target.position;
+        await Task.Run(async () =>
+        {
+
+            Vector3 halfChunkSize = new Vector3(ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f);
+            float distSquared = renderDistance * ChunkSize * renderDistance * ChunkSize;
+
+            if (generatingChunks)
+                return;
+
+            generatingChunks = true;
+
+
+            Vector3Int targetChunkPos = new Vector3Int(
+                Mathf.FloorToInt(targetPosition.x / ChunkSize),
+                Mathf.FloorToInt(targetPosition.y / ChunkSize),
+                Mathf.FloorToInt(targetPosition.z / ChunkSize)
+            );
+
+            ConcurrentBag<Vector3Int> chunkPositionsBag = new ConcurrentBag<Vector3Int>();
+
+            Parallel.For(-renderDistance, renderDistance + 1, x =>
+            {
+                for (int y = -renderDistance; y <= renderDistance; y++)
+                {
+                    for (int z = -renderDistance; z <= renderDistance; z++)
+                    {
+                        Vector3Int chunkPosition = new Vector3Int(
+                            targetChunkPos.x + x,
+                            targetChunkPos.y + y,
+                            targetChunkPos.z + z
+                        );
+
+                        Vector3 chunkCenter = chunkPosition * ChunkSize + halfChunkSize;
+                        float distance = (chunkCenter - targetPosition).sqrMagnitude;
+
+                        if (distance < distSquared && !activeChunks.ContainsKey(chunkPosition))
+                        {
+                            chunkPositionsBag.Add(chunkPosition);
+                        }
+                    }
+                }
+            });
+
+            List<Vector3Int> sortedChunkPositions = chunkPositionsBag.ToList();
+            sortedChunkPositions.Sort((a, b) =>
+            {
+                float distanceA = Vector3.Distance(targetPosition, a * ChunkSize);
+                float distanceB = Vector3.Distance(targetPosition, b * ChunkSize);
+                return distanceA.CompareTo(distanceB);
+            });
+
+            foreach (Vector3Int chunkPosition in sortedChunkPositions)
+            {
+                await Task.Delay(16);
+                if (cancelledGeneration)
+                {
+                    cancelledGeneration = false;
+                    break;
+                }
+                chunksToCreate.Enqueue(chunkPosition);
+            }
+
+            generatingChunks = false;
+            await Task.CompletedTask;
+
+
+        });
+
+
+    }
+
+
+ 
     void Update()
     {
+
+        if (Input.GetKeyDown(KeyCode.Alpha0))
+        {
+            SaveGame(Application.dataPath + "/../" + "Saves/Save.dat");
+        }
+        if (Input.GetKeyDown(KeyCode.Alpha9))
+        {
+            LoadGame(Application.dataPath + "/../" + "Saves/Save.dat");
+        }
+
+        if (Vector3.Distance(target.position, previousTargetPosition) > ChunkSize || previousTargetRotation != Mathf.Round(target.rotation.eulerAngles.y))
+        {
+            previousTargetPosition = target.position;
+            previousTargetRotation = Mathf.Round(target.rotation.eulerAngles.y);
+            cancelledGeneration = true;
+        }
+
         GameTime += Time.deltaTime;
-        float SkyValue = 15 - (Mathf.Sin(GameTime * Daylength / 500) * 15);
-        int newSkyIntensity = Mathf.RoundToInt(SkyValue);
-
-        if(newSkyIntensity != SkyIntensity)
-        {
-            StartCoroutine(UpdateChunkLighting());
-        }
-
-        SkyIntensity = newSkyIntensity;
-
-        if (SkyShader)
-        {
-            SkyShader.SetFloat("_Sky", SkyValue / 15);
-        }
+        float SkyValue = ((Mathf.Sin(GameTime * Daylength / 500) * 360)) % 360;
+        DirectionalLight.transform.rotation = Quaternion.Euler(SkyValue, 45, 0);
+        DirectionalLight.intensity = 2 * Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up);
+        RenderSettings.ambientLight = AmbientColor * Mathf.Clamp(Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up), MinimumAmbient, 1);
 
         if (Instance == null)
         {
@@ -121,111 +335,107 @@ public class ChunkManager : MonoBehaviour
         }
 
 
+        while (chunksToCreate.TryDequeue(out Vector3Int chunkPosition))
+        {
+            CreateChunk(chunkPosition);
+        }
+
         UpdateChunks();
 
-
-        if (Vector3.Distance(target.position, previousTargetPosition) > ChunkSize || previousTargetRotation != Mathf.Round(target.rotation.eulerAngles.y))
-        {
-            if (generateChunksCoroutine != null)
-            {
-                StopCoroutine(generateChunksCoroutine);
-            }
-
-            generateChunksCoroutine = StartCoroutine(GenerateChunks());
-
-
-            previousTargetPosition = target.position;
-            previousTargetRotation = Mathf.Round(target.rotation.eulerAngles.y);
-        }
     }
 
 
+    private bool generatingChunks = false;
 
-
-    IEnumerator GenerateChunks()
+    private void CreateChunk(Vector3Int chunkPosition)
     {
+        if (activeChunks.ContainsKey(chunkPosition))
+            return;
 
-        List<Vector3Int> sortedChunkPositions = new List<Vector3Int>();
-
-        for (int x = -renderDistance; x <= renderDistance; x++)
+        GameObject newChunk = new GameObject
         {
-            for (int y = -renderDistance; y <= renderDistance; y++)
-            {
-                for (int z = -renderDistance; z <= renderDistance; z++)
-                {
-                    Vector3Int chunkPosition = new Vector3Int(
-                        Mathf.FloorToInt(target.position.x / ChunkSize) + x,
-                        Mathf.FloorToInt(target.position.y / ChunkSize) + y,
-                        Mathf.FloorToInt(target.position.z / ChunkSize) + z
-                    );
+            name = $"{chunkPosition.x}_{chunkPosition.y}_{chunkPosition.z}",
+            transform = { position = chunkPosition * ChunkSize }
+        };
 
-                    Vector3 chunkCenter = chunkPosition * ChunkSize + new Vector3(ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f);
-                    Vector3 cameraToChunk = chunkCenter - target.position;
-
-                    float distance = cameraToChunk.magnitude;
-
-                    if (distance < renderDistance * ChunkSize)
-                    {
-                        sortedChunkPositions.Add(chunkPosition);
-                    }
-                }
-            }
+        if (ChunkBorders)
+        {
+            GameObject border = Instantiate(ChunkBorderPrefab, newChunk.transform);
+            border.transform.localScale = Vector3.one * ChunkSize;
         }
 
+        Chunk chunk = newChunk.AddComponent<Chunk>();
+        chunk.Init(mat, transparent, TransparentBlocks.ToArray(), NoCollisonBlocks.ToArray(), ChunkSize, TextureSize, BlockSize, chunkPosition);
 
-        sortedChunkPositions.Sort((a, b) =>
+        activeChunks.Add(chunkPosition, chunk);
+        activeChunksObj.Add(chunkPosition, newChunk);
+
+        byte[,,] newData;
+        if (!chunkCache.ContainsKey(chunkPosition))
         {
-            float distanceA = Vector3.Distance(target.position, a * ChunkSize);
-            float distanceB = Vector3.Distance(target.position, b * ChunkSize);
-            return distanceA.CompareTo(distanceB);
-        });
-
-
-        foreach (Vector3Int chunkPosition in sortedChunkPositions)
-        {
-            if (!activeChunks.ContainsKey(chunkPosition))
-            {
-                GameObject newChunk = new GameObject();
-                newChunk.name = chunkPosition.x + "_" + chunkPosition.y + "_" + chunkPosition.z;
-                newChunk.transform.position = chunkPosition * ChunkSize;
-
-                if (ChunkBorders)
-                {
-                    GameObject Border = GameObject.Instantiate(ChunkBorderPrefab, newChunk.transform);
-                    Border.transform.localScale = Vector3.one * ChunkSize;
-                }
-
-                Chunk chunk = newChunk.AddComponent<Chunk>();
-                chunk.Init(mat, transparent, TransparentBlocks.ToArray(), NoCollisonBlocks.ToArray(), ChunkSize, TextureSize, BlockSize, chunkPosition);
-
-                activeChunks.Add(chunkPosition, chunk);
-                activeChunksObj.Add(chunkPosition, newChunk);
-
-                if (chunk)
-                {
-                    byte[,,] NewData = new byte[ChunkSize, ChunkSize, ChunkSize]; 
-                    if (!chunkCache.ContainsKey(chunkPosition))
-                    {
-                        NewData = SetTerrain(chunk);
-                    }
-                    else
-                    {
-                        NewData = chunkCache[chunkPosition];
-                    }
-                    chunk.SetData(NewData);
-                    chunk.GenerateTerrain();
-                    if (NewData != new byte[ChunkSize, ChunkSize, ChunkSize])
-                    {
-                        yield return new WaitForSeconds(.1f);
-                    }
-                }
-            }
+            newData = SetTerrain(chunk);
         }
+        else
+        {
+            newData = chunkCache[chunkPosition];
+        }
+        chunk.SetData(newData);
+        chunk.GenerateTerrain();
     }
+
+
+
+
 
     public float waterLevel = 10;
     public float height = 25;
     public float scale = 0.01f;
+
+
+
+    float Errosion(Vector3 position, float scale)
+    {
+        float initialOffset = seed / 1000f;
+        float frequency = scale;
+
+        float sampleX = ((position.x) + initialOffset) * frequency;
+        float sampleY = ((position.z) + initialOffset) * frequency;
+
+
+        float perlinValue = (Mathf.PerlinNoise(sampleX, sampleY) - 0.5f) * 2;
+
+        return perlinValue;
+    }
+
+    float Continentalness(Vector3 position, float scale, int octaves, float persistence, float lacunarity)
+    {
+        float initialOffset = seed / 1000f;
+
+        float amplitude = 1f;
+        float frequency = scale;
+        float continentalness = 0f;
+
+        for (int octave = 0; octave < octaves; octave++)
+        {
+            // Convert position to float and adjust based on scale and frequency
+            float sampleX = ((position.x) + initialOffset) * frequency;
+            float sampleY = ((position.z) + initialOffset) * frequency;
+
+            // Sample the Perlin noise
+            float perlinValue = Mathf.PerlinNoise(sampleX, sampleY) * 2f - 1f;
+            continentalness += perlinValue * amplitude;
+
+            // Update amplitude and frequency for the next octave
+            amplitude *= persistence;
+            frequency *= lacunarity;
+        }
+
+        // Normalize the result to range between 0 and 1
+        continentalness = Mathf.Clamp01((continentalness + 1f) / 2f);
+        continentalness = terrainCurve.Evaluate(continentalness);
+
+        return continentalness;
+    }
 
 
     byte[,,] SetTerrain(Chunk chunk)
@@ -236,28 +446,38 @@ public class ChunkManager : MonoBehaviour
         byte[,,] VoxelData = new byte[ChunkSize, ChunkSize, ChunkSize];
         Vector3 chunkCornerWorldPos = chunk.transform.position;
 
+
         for (int x = 0; x < ChunkSize; x++)
         {
-            for (int y = 0; y < ChunkSize; y++)
+            for (int z = 0; z < ChunkSize; z++)
             {
-                for (int z = 0; z < ChunkSize; z++)
+                Vector3 voxelPosition2D = chunkCornerWorldPos + new Vector3(x, 0, z);
+                float _Continentalness = Continentalness(voxelPosition2D, scale, 4, 0.5f, 2);
+                float _Errosion = Errosion(voxelPosition2D, scale / 5);
+
+                float perlinRaw = (_Continentalness * height) * _Errosion;
+
+                for (int y = 0; y < ChunkSize; y++)
                 {
                     Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
 
                     byte voxelValue = 0;
 
-                    float perlinValue = Mathf.PerlinNoise((voxelPosition.x + (seed/1000)) * scale, (voxelPosition.z + (seed / 1000)) * scale) * height;
-
-                    int ycoord = (byte)(Mathf.RoundToInt(perlinValue));
+                    float offset = (seed / 1000);
 
 
-                    if (voxelPosition.y > ycoord && voxelPosition.y <= waterLevel)
+                    float perlinValue = perlinRaw;
+
+                    int perlinRounded = (Mathf.RoundToInt(perlinValue));
+
+
+                    if (voxelPosition.y > perlinRounded && voxelPosition.y <= waterLevel)
                     {
                         voxelValue = BlockList["Water"];
                     }
                     else
                     {
-                        if (voxelPosition.y == ycoord)
+                        if (voxelPosition.y == perlinRounded)
                         {
                             if(voxelPosition.y == waterLevel)
                             {
@@ -277,11 +497,11 @@ public class ChunkManager : MonoBehaviour
                         }
                         else
                         {
-                            if (voxelPosition.y < ycoord)
+                            if (voxelPosition.y < perlinRounded)
                             {
                                 voxelValue = BlockList["Dirt"]; //dirt
                             }
-                            if (voxelPosition.y < ycoord - 4)
+                            if (voxelPosition.y < perlinRounded - 4)
                             {
                                 voxelValue = BlockList["Stone"]; //stone
                             }
@@ -308,7 +528,10 @@ public class ChunkManager : MonoBehaviour
                         {
                             for (int i = y + 1; i < y + 4; i++)
                             {
-                                VoxelData[x, i, z] = BlockList["Oak Log"]; 
+                                if (VoxelData[x, i, z] == 0)
+                                {
+                                    VoxelData[x, i, z] = BlockList["Oak Log"];
+                                }
                             }
                             for (int offsetY = y + 4; offsetY < y + 8; offsetY++)
                             {
@@ -316,7 +539,10 @@ public class ChunkManager : MonoBehaviour
                                 {
                                     for (int offsetZ = -2; offsetZ <= 2; offsetZ++)
                                     {
-                                        VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Leaves"];
+                                        if (VoxelData[x + offsetX, offsetY, z + offsetZ] == 0)
+                                        {
+                                            VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Leaves"];
+                                        }
                                     }
                                 }
                             }
@@ -361,20 +587,28 @@ public class ChunkManager : MonoBehaviour
         return false; // No wood neighbors found
     }
 
-    public static float Perlin3D(float x, float y, float z, float scale)
+
+
+    public float Perlin3D(float x, float y, float z, float scale)
     {
-        float XY = Mathf.PerlinNoise(x * scale, y * scale);
-        float YZ = Mathf.PerlinNoise(y * scale, z * scale);
-        float XZ = Mathf.PerlinNoise(x * scale, z * scale);
+        x *= scale;
+        y *= scale;
+        z *= scale;
+        float xy = Mathf.PerlinNoise(x, y);
+        float xz = Mathf.PerlinNoise(x, z);
+        float yz = Mathf.PerlinNoise(y, z);
+        float yx = Mathf.PerlinNoise(y, x);
+        float zx = Mathf.PerlinNoise(z, x);
+        float zy = Mathf.PerlinNoise(z, y);
 
-        float YX = Mathf.PerlinNoise(y * scale, x * scale);
-        float ZY = Mathf.PerlinNoise(z * scale, y * scale);
-        float ZX = Mathf.PerlinNoise(z * scale, x * scale);
+        return (xy + xz + yz + yx + zx + zy) / 6;
 
-        // Sum up the 2D Perlin noise values and normalize
-        float val = (XY + YZ + XZ + YX + ZY + ZX) / 6f;
-        return val;
     }
+
+
+
+
+
 
 
 
@@ -467,66 +701,6 @@ public class ChunkManager : MonoBehaviour
     }
 
 
-    public void SetLightAtWorldPosition(Vector3 worldPosition, int channel, byte light)
-    {
-        Vector3Int chunkPosition = new Vector3Int(
-            Mathf.FloorToInt(worldPosition.x / ChunkSize),
-            Mathf.FloorToInt(worldPosition.y / ChunkSize),
-            Mathf.FloorToInt(worldPosition.z / ChunkSize)
-        );
-
-
-        if (activeChunks.ContainsKey(chunkPosition))
-        {
-            Chunk chunk = activeChunks[chunkPosition];
-            Vector3 localPosition = chunk.transform.InverseTransformPoint(worldPosition);
-
-
-            int voxelX = Mathf.FloorToInt(localPosition.x);
-            int voxelY = Mathf.FloorToInt(localPosition.y);
-            int voxelZ = Mathf.FloorToInt(localPosition.z);
-
-            chunk.SetLight(voxelX, voxelY, voxelZ, channel, light);
-        }
-        else
-        {
-            Debug.LogWarning("Chunk at position " + chunkPosition + " is not active.");
-        }
-    }
-
-    public (byte, byte, byte) GetLightAtWorldPosition(Vector3 worldPosition)
-    {
-        Vector3Int chunkPosition = new Vector3Int(
-            Mathf.FloorToInt(worldPosition.x / ChunkSize),
-            Mathf.FloorToInt(worldPosition.y / ChunkSize),
-            Mathf.FloorToInt(worldPosition.z / ChunkSize)
-        );
-
-
-        if (activeChunks.ContainsKey(chunkPosition))
-        {
-            Chunk chunk = activeChunks[chunkPosition];
-            Vector3 localPosition = chunk.transform.InverseTransformPoint(worldPosition);
-
-
-            int voxelX = Mathf.FloorToInt(localPosition.x);
-            int voxelY = Mathf.FloorToInt(localPosition.y);
-            int voxelZ = Mathf.FloorToInt(localPosition.z);
-
-
-            byte R = chunk.GetLightDataR()[voxelX, voxelY, voxelZ];
-            byte G = chunk.GetLightDataG()[voxelX, voxelY, voxelZ];
-            byte B = chunk.GetLightDataB()[voxelX, voxelY, voxelZ];
-            return (R, G, B);   
-        }
-        else
-        {
-            Debug.LogWarning("Chunk at position " + chunkPosition + " is not active.");
-        }
-        return (0, 0, 0);
-    }
-
-
 
 
 
@@ -547,25 +721,34 @@ public class ChunkManager : MonoBehaviour
 
     void UpdateChunks()
     {
-        List<Vector3Int> chunksToRemove = new List<Vector3Int>();
 
-        foreach (var chunk in activeChunksObj)
+        var chunkKeys = new List<Vector3Int>(activeChunksObj.Keys);
+
+
+        var chunksToRemove = new ConcurrentBag<Vector3Int>();
+
+        Vector3 TargetPos = target.position;
+
+        // Use Parallel.For to iterate over the chunks
+        Parallel.For(0, chunkKeys.Count, i =>
         {
-            Vector3Int chunkPosition = chunk.Key;
-            GameObject chunkObj = chunk.Value;
-            float distance = Vector3.Distance(chunkObj.transform.position, target.position);
+            Vector3Int chunkPosition = chunkKeys[i];
+            GameObject chunkObj = activeChunksObj[chunkPosition];
+            float distance = Vector3.Distance(chunkPosition * ChunkSize, TargetPos);
 
             if (distance > renderDistance * ChunkSize)
             {
-                Destroy(chunk.Value);
                 chunksToRemove.Add(chunkPosition);
             }
-        }
+        });
+        List<Vector3Int> chunksToRemoveList = new List<Vector3Int>(chunksToRemove);
 
-        foreach (var chunkPosition in chunksToRemove)
+        foreach (var chunkPosition in chunksToRemoveList)
         {
+            Destroy(activeChunksObj[chunkPosition].gameObject);
             activeChunks.Remove(chunkPosition);
             activeChunksObj.Remove(chunkPosition);
         }
     }
+
 }

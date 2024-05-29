@@ -11,6 +11,11 @@ public class BlockPlace : MonoBehaviour
     public Vector3 ChunkPosition;
     private int selectedBlockIndex = 0;
     private ChunkManager chunkManager;
+    public LayerMask ignore;
+    public LayerMask playerLayer;
+    public MeshRenderer[] HandBlock;
+    public float TextureSize;
+    public float BlockSize;
     void Start()
     {
         chunkManager = ChunkManager.Instance;
@@ -23,6 +28,7 @@ public class BlockPlace : MonoBehaviour
                 blockList.Add(new Block(item.Key, item.Value));
             }
         }
+        UpdateBlockVisual();
     }
 
     private string FindKeyFromValue(Dictionary<string, byte> dictionary, byte value)
@@ -36,6 +42,30 @@ public class BlockPlace : MonoBehaviour
         }
         return null;
     }
+
+    void UpdateBlockVisual()
+    {
+        for (int i = 0; i < HandBlock.Length; i++)
+        {
+            byte newTexID = (byte)chunkManager.BlockFaces[(byte)blockList[selectedBlockIndex].blockId][i];
+            byte blockId = blockList[selectedBlockIndex].blockId;
+
+            int textureID = newTexID == 0 ? blockId - 1 : newTexID;
+
+            float atlasSize = TextureSize;
+            float blockSize = BlockSize;
+            float blocksPerRow = atlasSize / blockSize;
+            float row = Mathf.Floor(textureID / blocksPerRow);
+            float col = textureID % blocksPerRow;
+            float blockX = col * (blockSize / atlasSize);
+            float blockY = row * (blockSize / atlasSize);
+            float uvSize = 1.0f / blocksPerRow;
+            Material copyMat = HandBlock[i].material;
+            copyMat.SetColor("_Offset", new Color(blockX, blockY, 0));
+            HandBlock[i].material = copyMat;
+        }
+    }
+
     void Update()
     {
 
@@ -44,11 +74,15 @@ public class BlockPlace : MonoBehaviour
         if (scroll > 0f)
         {
             selectedBlockIndex = (selectedBlockIndex + 1) % blockList.Count;
+            UpdateBlockVisual();
         }
         else if (scroll < 0f)
         {
             selectedBlockIndex = (selectedBlockIndex - 1 + blockList.Count) % blockList.Count;
+            UpdateBlockVisual();
         }
+
+
 
 
         Chunk currentChunk = chunkManager.GetChunk(transform.position);
@@ -57,15 +91,17 @@ public class BlockPlace : MonoBehaviour
         }
         RaycastHit CheckHit;
         Ray CheckRay = Camera.main.ScreenPointToRay(Input.mousePosition);
-        if (Physics.Raycast(CheckRay, out CheckHit, Dist))
+        if (Physics.Raycast(CheckRay, out CheckHit, Dist, ~ignore))
         {
             Vector3 targetPosition = CheckHit.point - CheckHit.normal / 2f;
             LookingAt = FindKeyFromValue(chunkManager.BlockList, chunkManager.GetVoxelPosition(targetPosition));
+            Debug.DrawLine(transform.position, CheckHit.point, Color.red);
         }
         else
         {
             LookingAt = "Air";
         }
+
 
 
         if (Input.GetMouseButtonDown(0))
@@ -74,7 +110,7 @@ public class BlockPlace : MonoBehaviour
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
             // Perform a raycast
-            if (Physics.Raycast(ray, out hit, Dist))
+            if (Physics.Raycast(ray, out hit, Dist, ~ignore))
             {
 
                 Vector3 targetPosition = hit.point - hit.normal / 2f;
@@ -87,11 +123,15 @@ public class BlockPlace : MonoBehaviour
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
             // Perform a raycast
-            if (Physics.Raycast(ray, out hit, Dist))
+            if (Physics.Raycast(ray, out hit, Dist, ~ignore))
             {
 
                 Vector3 targetPosition = hit.point + hit.normal / 2f;
-                PlaceBlock(targetPosition, blockList[selectedBlockIndex].blockId);
+                RaycastHit PlayerRay;
+                if (!Physics.SphereCast(hit.point - hit.normal, 1f, hit.normal, out PlayerRay, 1f, playerLayer))
+                {
+                    PlaceBlock(targetPosition, blockList[selectedBlockIndex].blockId);
+                }
             }
         }
     }

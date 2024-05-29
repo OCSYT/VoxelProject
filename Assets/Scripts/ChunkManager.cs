@@ -43,6 +43,52 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
+
+
+    [Serializable]
+    public class SerializableVector3
+    {
+        public float x, y, z;
+        public SerializableVector3() { }
+
+        public SerializableVector3(int x, int y, int z)
+        {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        public SerializableVector3(Vector3 vector)
+        {
+            this.x = vector.x;
+            this.y = vector.y;
+            this.z = vector.z;
+        }
+
+        public Vector3 ToVector3()
+        {
+            return new Vector3(x, y, z);
+        }
+    }
+
+    [Serializable]
+    public class PlayerData
+    {
+        public string Name;
+        public float Y;
+        public SerializableVector3 Position;
+
+        public PlayerData() { }
+
+        public PlayerData(string name, Vector3Int position, float y)
+        {
+            Name = name;
+            Position = new SerializableVector3(position);
+            Y = y;
+        }
+    }
+
+
     [Serializable]
     public class ChunkData
     {
@@ -75,28 +121,55 @@ public class ChunkManager : MonoBehaviour
     public class SaveData
     {
         public int Seed;
+        public SerializableVector3Int SpawnPosition;
+        public float GameTime;
         public List<ChunkData> Chunks;
+        public List<PlayerData> Players;
 
         public SaveData() { }
-        public SaveData(int seed, Dictionary<Vector3Int, byte[,,]> chunkCache)
+
+        public SaveData(int seed, float time, Vector3Int _SpawnPosition,  Dictionary<Vector3Int, byte[,,]> chunkCache, List<PlayerData> players)
         {
+            SpawnPosition = new SerializableVector3Int(_SpawnPosition);
             Seed = seed;
+            GameTime = time;
             Chunks = chunkCache.Select(kvp => new ChunkData(kvp.Key, kvp.Value)).ToList();
+            Players = players;
         }
     }
 
+
     public void SaveGame(string filePath)
     {
-        SaveData saveData = new SaveData(seed, chunkCache);
+        // Collect player data
+        List<PlayerData> players = new List<PlayerData>();
+        foreach (var player in GameObject.FindObjectsOfType<Player>())
+        {
+            string playerName = player.gameObject.name;
+            Vector3Int playerPosition = Vector3Int.FloorToInt(player.transform.position);
+            players.Add(new PlayerData(playerName, playerPosition, player.transform.eulerAngles.y));
+        }
+
+        // Create SaveData object
+        SaveData saveData = new SaveData(seed, GameTime, Vector3Int.FloorToInt(SpawnPosition)   , chunkCache, players);
 
         // Serialize the SaveData object to JSON
         string jsonString = JsonConvert.SerializeObject(saveData, Formatting.Indented);
+
+        // Ensure the directory exists
+        string directoryPath = Path.GetDirectoryName(filePath);
+        if (!Directory.Exists(directoryPath))
+        {
+            Directory.CreateDirectory(directoryPath);
+        }
 
         // Write the JSON string to the file
         File.WriteAllText(filePath, jsonString);
 
         Debug.Log("Game saved successfully!");
     }
+
+
 
     public void LoadGame(string filePath)
     {
@@ -110,6 +183,8 @@ public class ChunkManager : MonoBehaviour
 
             // Restore seed
             seed = saveData.Seed;
+            GameTime = saveData.GameTime;
+            SpawnPosition = (saveData.SpawnPosition.ToVector3Int());
 
             // Clear current chunks
             foreach (var chunkPosition in activeChunksObj.Keys.ToList())
@@ -131,6 +206,26 @@ public class ChunkManager : MonoBehaviour
                 CreateChunk(chunk);
             }
 
+            // Restore player positions
+
+            foreach(Player p in GameObject.FindObjectsOfType<Player>())
+            {
+                p.transform.position = SpawnPosition;
+            }
+
+            foreach (var playerData in saveData.Players)
+            {
+                foreach (Player p in GameObject.FindObjectsOfType<Player>())
+                {
+                    if(p.gameObject.name == playerData.Name)
+                    {
+                        p.transform.position = (Vector3)(playerData.Position.ToVector3());
+                        p.transform.eulerAngles = new Vector3(0, playerData.Y, 0);
+                        break;
+                    }
+                }
+            }
+
             Debug.Log("Game loaded successfully!");
         }
         else
@@ -143,10 +238,11 @@ public class ChunkManager : MonoBehaviour
 
 
 
+
     [Serializable]
     public class Block
     {
-        public string Name = "NewBlock";
+        public string Name = "New Block";
         public byte Value = 0;
         public int FrontFace = 0;
         public int BackFace = 0;
@@ -154,13 +250,15 @@ public class ChunkManager : MonoBehaviour
         public int RightFace = 0;
         public int TopFace = 0;
         public int BottomFace = 0;
+        public bool Transparent;
+        public bool NoCollision;
 
         [ColorUsage(true, true)]
         public Color Light = Color.black;
     }
     public List<Block> Blocks = new List<Block>();
 
-    public int seed = System.Guid.NewGuid().GetHashCode();
+    private int seed;
     public GameObject ChunkBorderPrefab;
     public bool ChunkBorders;
     public int renderDistance = 5;
@@ -170,8 +268,8 @@ public class ChunkManager : MonoBehaviour
     public float BlockSize = 16;
     public Material mat;
     public Material transparent;
-    public List<byte> NoCollisonBlocks;
-    public List<byte> TransparentBlocks;
+    private List<byte> NoCollisonBlocks = new List<byte>();
+    private List<byte> TransparentBlocks = new List<byte>();
     public float Daylength = 1;
     public float GameTime = 0;
     public static ChunkManager Instance { get; private set; }
@@ -188,14 +286,28 @@ public class ChunkManager : MonoBehaviour
     public float MinimumAmbient;
     public int IgnoreLayer;
     private ConcurrentQueue<Vector3Int> chunksToCreate = new ConcurrentQueue<Vector3Int>();
-
-    void Awake()
+    public Vector3 SpawnPosition;
+    async void Awake()
     {
+        seed = PlayerPrefs.GetInt("Seed", System.Guid.NewGuid().GetHashCode());
+
+
+        int index = 0;
         foreach (var block in Blocks)
         {
+            block.Value = (byte)index; index++;
+            if (block.Transparent)
+            {
+                TransparentBlocks.Add(block.Value);
+            }
+            if (block.NoCollision)
+            {
+                NoCollisonBlocks.Add(block.Value);
+            }
+
             BlockList.Add(block.Name, block.Value);
             BlockListLight.Add(block.Value, block.Light);
-            BlockFaces.Add(block.Value, new int[] { block.FrontFace, block.BackFace, block.LeftFace, block.RightFace,block.TopFace, block.BottomFace });
+            BlockFaces.Add(block.Value, new int[] { block.FrontFace, block.BackFace, block.LeftFace, block.RightFace, block.TopFace, block.BottomFace });
         }
 
         if (Instance == null)
@@ -206,6 +318,18 @@ public class ChunkManager : MonoBehaviour
         previousTargetRotation = Mathf.Round(target.rotation.eulerAngles.y);
         DirectionalLight = GameObject.FindObjectOfType<Light>();
         InvokeRepeating("GenerateChunkUpdate", 0, .1f);
+
+
+        if (PlayerPrefs.GetInt("LoadingMode", 0) == 1)
+        {
+            LoadGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
+        }
+        else
+        {
+            SpawnPosition = await GetFirstLandPosition();
+            Player p = GameObject.FindObjectOfType<Player>();
+            p.transform.position = SpawnPosition;
+        }
     }
 
     private byte[,,] ConvertTo3DArray(List<byte> data, int sizeX, int sizeY, int sizeZ)
@@ -307,14 +431,6 @@ public class ChunkManager : MonoBehaviour
     void Update()
     {
 
-        if (Input.GetKeyDown(KeyCode.Alpha0))
-        {
-            SaveGame(Application.dataPath + "/../" + "Saves/Save.dat");
-        }
-        if (Input.GetKeyDown(KeyCode.Alpha9))
-        {
-            LoadGame(Application.dataPath + "/../" + "Saves/Save.dat");
-        }
 
         if (Vector3.Distance(target.position, previousTargetPosition) > ChunkSize || previousTargetRotation != Mathf.Round(target.rotation.eulerAngles.y))
         {
@@ -438,6 +554,42 @@ public class ChunkManager : MonoBehaviour
     }
 
 
+    async Task<Vector3> GetFirstLandPosition()
+    {
+        Vector3 FinalPos = Vector3.zero;
+
+        await Task.Run(async () =>
+        {
+            for (int x = 0; x < Mathf.Infinity; x++) // Infinite loop for x-axis
+            {
+                Vector3 voxelPosition2D = new Vector3(x, 0, 0);
+                float _Continentalness = Continentalness(voxelPosition2D, scale, 4, 0.5f, 2);
+                float _Errosion = Errosion(voxelPosition2D, scale / 5);
+
+                for (int y = 0; y < ChunkSize; y++)
+                {
+                    float perlinRaw = (_Continentalness * height) * _Errosion;
+                    float perlinValue = perlinRaw;
+                    int perlinRounded = (Mathf.RoundToInt(perlinValue));
+
+                    if (y == perlinRounded && y > waterLevel)
+                    {
+                        FinalPos = new Vector3(x, perlinRounded, 0);
+                        return; // Exit the loop once a land position is found
+                    }
+                }
+
+                await Task.Delay(10); // Add a delay to prevent freezing the process
+            }
+        });
+
+        return FinalPos + new Vector3(0.5f, 2.5f, 0.5f);
+    }
+
+
+
+
+
     byte[,,] SetTerrain(Chunk chunk)
     {
         System.Random random = new System.Random(seed + (int)chunk.transform.position.x
@@ -462,8 +614,6 @@ public class ChunkManager : MonoBehaviour
                     Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
 
                     byte voxelValue = 0;
-
-                    float offset = (seed / 1000);
 
 
                     float perlinValue = perlinRaw;
@@ -672,10 +822,11 @@ public class ChunkManager : MonoBehaviour
             Chunk chunk = activeChunks[chunkPosition];
             Vector3 localPosition = chunk.transform.InverseTransformPoint(worldPosition);
 
-
             int voxelX = Mathf.FloorToInt(localPosition.x);
             int voxelY = Mathf.FloorToInt(localPosition.y);
             int voxelZ = Mathf.FloorToInt(localPosition.z);
+
+    
 
             return chunk.GetData()[voxelX, voxelY, voxelZ];
         }

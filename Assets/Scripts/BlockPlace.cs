@@ -16,6 +16,8 @@ public class BlockPlace : MonoBehaviour
     public MeshRenderer[] HandBlock;
     public float TextureSize;
     public float BlockSize;
+    public Player player;
+    public Transform blockPreview;
     void Start()
     {
         chunkManager = ChunkManager.Instance;
@@ -68,7 +70,7 @@ public class BlockPlace : MonoBehaviour
 
     void Update()
     {
-
+        if (player.isPaused || !player.AllowMovement) return;
         float scroll = Input.GetAxis("Mouse ScrollWheel");
 
         if (scroll > 0f)
@@ -94,12 +96,26 @@ public class BlockPlace : MonoBehaviour
         if (Physics.Raycast(CheckRay, out CheckHit, Dist, ~ignore))
         {
             Vector3 targetPosition = CheckHit.point - CheckHit.normal / 2f;
+
+            Vector3 targetPositionPreview = CheckHit.point - CheckHit.normal / 2;
+
+            // Calculate the correct aligned position
+            blockPreview.position = new Vector3(
+                Mathf.Floor(targetPositionPreview.x) + 0.5f,
+                Mathf.Floor(targetPositionPreview.y) + 0.5f,
+                Mathf.Floor(targetPositionPreview.z) + 0.5f
+            );
+
+
+            blockPreview.transform.rotation = Quaternion.identity;
+            blockPreview.gameObject.SetActive(true);
             LookingAt = FindKeyFromValue(chunkManager.BlockList, chunkManager.GetVoxelPosition(targetPosition));
             Debug.DrawLine(transform.position, CheckHit.point, Color.red);
         }
         else
         {
             LookingAt = "Air";
+            blockPreview.gameObject.SetActive(false);
         }
 
 

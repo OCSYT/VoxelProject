@@ -75,14 +75,15 @@ public class ChunkManagerEditor : Editor
 
             // Draw the properties of the Block manually
             EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("Name"));
-            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 2, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("Value"));
-            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 3, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("FrontFace"));
-            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 4, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("BackFace"));
-            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 5, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("LeftFace"));
-            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 6, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("RightFace"));
-            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 7, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("TopFace"));
-            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 8, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("BottomFace"));
-            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 9, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("Light"));
+            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 2, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("FrontFace"));
+            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 3, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("BackFace"));
+            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 4, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("LeftFace"));
+            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 5, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("RightFace"));
+            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 6, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("TopFace"));
+            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 7, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("BottomFace"));
+            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 8, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("Light"));
+            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 9, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("Transparent"));
+            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 10, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("NoCollision"));
 
             if (AtlasTexture != null)
             {
@@ -110,20 +111,46 @@ public class ChunkManagerEditor : Editor
         float buttonWidth = 20f;
         float buttonHeight = EditorGUIUtility.singleLineHeight;
         float buttonY = rect.y + EditorGUIUtility.singleLineHeight * 10;
-        float buttonX = rect.x + rect.width - buttonWidth * 2;
+        float buttonX = rect.x + rect.width - buttonWidth * 4; // Adjusting for four buttons
 
-        if (GUI.Button(new Rect(buttonX, buttonY, buttonWidth, buttonHeight), "↑") && index > 0)
+        // Move up button
+        if (GUI.Button(new Rect(buttonX - buttonWidth * 6, buttonY, buttonWidth, buttonHeight), "↑") && index > 0)
         {
             blocksProperty.MoveArrayElement(index, index - 1);
             SwapFoldoutStates(index, index - 1);
         }
 
-        if (GUI.Button(new Rect(buttonX + buttonWidth, buttonY, buttonWidth, buttonHeight), "↓") && index < blocksProperty.arraySize - 1)
+        // Move down button
+        if (GUI.Button(new Rect(buttonX - buttonWidth * 5, buttonY, buttonWidth, buttonHeight), "↓") && index < blocksProperty.arraySize - 1)
         {
             blocksProperty.MoveArrayElement(index, index + 1);
             SwapFoldoutStates(index, index + 1);
         }
+
+        // Send to top button
+        if (GUI.Button(new Rect(buttonX - buttonWidth * 4, buttonY, buttonWidth * 4, buttonHeight), "To top") && index > 0)
+        {
+            blocksProperty.MoveArrayElement(index, 0);
+            // Update foldout states
+            for (int i = index; i > 0; i--)
+            {
+                SwapFoldoutStates(i, i - 1);
+            }
+        }
+
+        // Send to bottom button
+        if (GUI.Button(new Rect(buttonX, buttonY, buttonWidth * 4, buttonHeight), "To bottom") && index < blocksProperty.arraySize - 1)
+        {
+            blocksProperty.MoveArrayElement(index, blocksProperty.arraySize - 1);
+            // Update foldout states
+            for (int i = index; i < blocksProperty.arraySize - 1; i++)
+            {
+                SwapFoldoutStates(i, i + 1);
+            }
+        }
     }
+
+
 
     private void DrawFacePreview(SerializedProperty element, string faceName, Texture2D atlasTexture, Rect rect)
     {

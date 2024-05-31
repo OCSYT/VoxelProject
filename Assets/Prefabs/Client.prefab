@@ -4446,6 +4446,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7206329216063918418}
   - component: {fileID: 751794549677066701}
+  - component: {fileID: 9130220636842330622}
   m_Layer: 0
   m_Name: Chunk
   m_TagString: Untagged
@@ -5155,9 +5156,25 @@ MonoBehaviour:
   MinimumAmbient: 0.25
   IgnoreLayer: 2
   SpawnPosition: {x: 0, y: 0, z: 0}
+  SaveDataBytes: 
+  ShareFile: {fileID: 9130220636842330622}
   waterLevel: 10
   height: 400
   scale: 0.005
+  worldFloor: -100
+  superflatHeight: 3
+--- !u!114 &9130220636842330622
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5644313012790769403}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66b7289c855e1664b9c4d0839fd113ab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &5675895691116455174
 GameObject:
   m_ObjectHideFlags: 0

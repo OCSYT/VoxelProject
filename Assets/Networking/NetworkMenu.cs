@@ -157,7 +157,8 @@ public class NetworkMenu : MonoBehaviour
         {
             Debug.Log("Lobby was created");
             lobby.SetPublic();
-            lobby.SetData("name", new System.Guid().ToString());
+            lobby.SetData("Name", new System.Guid().ToString());
+            lobby.SetData("WorldName", PlayerPrefs.GetString("WorldName"));
             lobby.SetJoinable(true);
             lobby.SetGameServer(lobby.Owner.Id);
             CodeToJoin = lobby.Id;

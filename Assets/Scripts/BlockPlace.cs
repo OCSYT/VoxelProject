@@ -219,7 +219,6 @@ public class BlockPlace : NetworkBehaviour
     [ClientRpc]
     void PlaceBlockClientRPC(Vector3 position, byte blockId, bool buffer, bool regenerate, ulong id)
     {
-        Debug.Log(NetworkManager.LocalClientId + " " + id);
         if (NetworkManager.LocalClientId != id)
         {
             ChunkManager.Instance.SetVoxelAtWorldPosition(position, blockId, regenerate, true);

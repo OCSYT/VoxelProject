@@ -17,6 +17,9 @@ public class Menu : MonoBehaviour
     public Toggle superflattoggle;
     void Start()
     {
+
+        DeleteFolderContents(Application.dataPath + "/../" + "SaveCache/");
+
         WorldName.text = "New World";
         Seed.text = GenerateSeed();
         PlayerPrefs.SetString("WorldName", "");
@@ -24,6 +27,32 @@ public class Menu : MonoBehaviour
         PlayerPrefs.SetInt("LoadingMode", 0);
 
         DisplaySaves();
+    }
+
+    public void DeleteFolderContents(string folderPath)
+    {
+        if (Directory.Exists(folderPath))
+        {
+            // Delete all files
+            string[] files = Directory.GetFiles(folderPath);
+            foreach (string file in files)
+            {
+                File.Delete(file);
+            }
+
+            // Delete all subdirectories and their contents
+            string[] subdirectories = Directory.GetDirectories(folderPath);
+            foreach (string subdirectory in subdirectories)
+            {
+                Directory.Delete(subdirectory, true); // true to delete subdirectories and their contents
+            }
+
+            Debug.Log("Folder contents deleted successfully.");
+        }
+        else
+        {
+            Debug.LogError("The specified folder does not exist: " + folderPath);
+        }
     }
 
 

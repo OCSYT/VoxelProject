@@ -8,6 +8,7 @@ using Netcode.Transports.Facepunch;
 using Unity.Netcode;
 using Steamworks;
 using Unity.Collections;
+using System.IO;
 [RequireComponent(typeof(CharacterController))]
 public class Player : NetworkBehaviour
 {
@@ -73,24 +74,27 @@ public class Player : NetworkBehaviour
     public NetworkVariable<bool> Hosting = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     [HideInInspector]
     public NetworkVariable<bool> Moving = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-    [HideInInspector]
-    public NetworkList<byte> NetworkSaveDataBytes = new NetworkList<byte>(null, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    private string TargetWorldName;
 
-
-    private void Start()
+    public void Teleport(Vector3 Position)
+    {
+        controller.enabled = false;
+        transform.position = Position;
+    }
+    private void Awake()
     {
         controller = gameObject.GetComponent<CharacterController>();
         controller.enabled = false;
+    }
+
+    private void Start()
+    {
 
         if (IsOwner)
         {
             Hosting.Value = IsHost;
             Username.Value = (FixedString32Bytes)SteamClient.Name;
             LoadingScreen.SetActive(true);
-            if (IsHost)
-            {
-                StartCoroutine(InitSync(new List<(Vector3, byte)>()));
-            }
             UsernameRoot.gameObject.SetActive(false);
 
             RenderDistanceSlider.value = PlayerPrefs.GetInt("RenderDistance", 8);
@@ -114,10 +118,15 @@ public class Player : NetworkBehaviour
         }
         gameObject.name = Username.Value.ToString();
 
-
+        TargetWorldName = NetworkMenu.instance.currentLobby.Value.GetData("WorldName");
         if (NetworkManager.IsHost)
         {
-            GetHost().SyncRequestServerRPC();
+            Player host = GetHost();
+            if (Synced.Value == false && (this != host))
+            {
+                host.chunkManager.SyncSave(this.OwnerClientId);
+            }
+            host.SyncRequestServerRPC();
         }
     }
     private void OnDestroy()
@@ -127,6 +136,7 @@ public class Player : NetworkBehaviour
             GetHost().BlockPlace.BufferedBlockEvents.Clear();
             GetHost().chunkManager.SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
         }
+        SendChatMessageLocal("<color=yellow>" + Username.Value.ToString() + " has left");
     }
     public Player GetHost()
     {
@@ -175,14 +185,11 @@ public class Player : NetworkBehaviour
             ByteList[i] = BlockEvents[i].Item2;
         }
 
-        Debug.Log("Server: " + BlockEvents.Count);
-
         SyncRequestClientRPC(VecList, ByteList);
     }
     [ClientRpc]
     public void SyncRequestClientRPC(Vector3[] VecList, byte[] ByteList)
     {
-        Debug.Log("recieved");
         List<(Vector3, byte)> BlockEvents = new List<(Vector3, byte)>();
         for (int i = 0; i < VecList.Length; i++)
         {
@@ -209,9 +216,15 @@ public class Player : NetworkBehaviour
 
             yield return new WaitUntil(() => ChunkManager.Instance != null);
             BlockPlace.BufferedBlockEvents = BlockEvents;
-            Debug.Log("Client: " + BlockEvents.Count);
             BlockPlace.PlaceBufferedBlocks();
             Cursor.lockState = CursorLockMode.Locked;
+            if (!IsHost)
+            {
+                while(File.Exists(Application.dataPath + "/../" + "SaveCache/" + TargetWorldName + ".dat") == false)
+                {
+                    yield return new WaitForSeconds(1);
+                }
+            }
             chunkManager.StartGenerating();
             StartCoroutine(WaitForInit());
         }
@@ -225,8 +238,10 @@ public class Player : NetworkBehaviour
     {
         AllowMovementInit = false;
         yield return new WaitUntil(() => chunkManager.SpawnPosition != Vector3.zero);
+        yield return new WaitForSeconds(3);
         AllowMovementInit = true;
         LoadingScreen.SetActive(false);
+        SendChatMessageServerRPC("<color=yellow>" + Username.Value.ToString() + " has joined");
     }
 
     [ServerRpc]
@@ -327,12 +342,11 @@ public class Player : NetworkBehaviour
             }
             WaitForChunkCoroutine = StartCoroutine(WaitForChunk());
         }
-        if (AllowMovement == false || AllowMovementInit == false) return;
+        if (AllowMovement == false) return;
         if (controller.enabled == false)
         {
             controller.enabled = true;
         }
-
 
 
         if (Input.GetKeyDown(KeyCode.T) && !IsPaused)
@@ -357,9 +371,7 @@ public class Player : NetworkBehaviour
                 }
                 else if(ChatInput.text == "/spawn")
                 {
-                    controller.enabled = false;
-                    transform.position = chunkManager.SpawnPosition;
-                    controller.enabled = true;
+                    Teleport(chunkManager.SpawnPosition);
                     SendChatMessageLocal("<color=green>Teleported!</color>");
                 }
                 else if (ChatInput.text.StartsWith("/tp "))
@@ -370,9 +382,7 @@ public class Player : NetworkBehaviour
                         string username = parts[1];
                         Player p = GetPlayerByName(username);
                         if(p != null && username != this.Username.Value) {
-                            controller.enabled = false;
-                            transform.position = p.transform.position;
-                            controller.enabled = true;
+                            Teleport(p.transform.position);
                             SendChatMessageLocal("<color=green>Teleported!</color>");
                         }
                         else
@@ -408,9 +418,7 @@ public class Player : NetworkBehaviour
 
         if(transform.position.y < -100)
         {
-            controller.enabled = false;
-            transform.position = chunkManager.SpawnPosition;
-            controller.enabled = true;
+            Teleport(chunkManager.SpawnPosition);
         }
 
 
@@ -508,6 +516,7 @@ public class Player : NetworkBehaviour
 
     void Move()
     {
+        if (controller.enabled == false) return;
         RaycastHit hit;
         float radius = .1f;
         groundedPlayer = Physics.SphereCast(transform.position, radius, -Vector3.up, out hit, (1.1f - radius), ~ignore);

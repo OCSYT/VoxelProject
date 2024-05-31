@@ -186,29 +186,9 @@ public class ChunkManager : NetworkBehaviour
         }
 
         File.WriteAllBytes(filePath, saveDataBytes);
-
-        Player p = GetHost();
-        if (IsHost)
-        {
-            p.NetworkSaveDataBytes.Clear();
-            foreach (byte value in saveDataBytes)
-            {
-                p.NetworkSaveDataBytes.Add(value);
-            }
-        }
         Debug.Log("Game saved successfully!");
     }
 
-    public byte[] GetSaveByteArray()
-    {
-        Player p = GetHost();
-        byte[] saveDataBytes = new byte[p.NetworkSaveDataBytes.Count];
-        for (int i = 0; i < saveDataBytes.Length; i++)
-        {
-            saveDataBytes[i] = p.NetworkSaveDataBytes[i];
-        }
-        return saveDataBytes;
-    }
 
     public void LoadGameFromBytes(byte[] saveDataBytes, bool local)
     {
@@ -235,18 +215,6 @@ public class ChunkManager : NetworkBehaviour
     {
         if (File.Exists(filePath))
         {
-            // Read the binary data from the file
-            Player p = GetHost();
-            if (IsHost)
-            {
-                byte[] saveDataBytes = File.ReadAllBytes(filePath);
-                p.NetworkSaveDataBytes.Clear();
-                foreach (byte value in saveDataBytes)
-                {
-                    p.NetworkSaveDataBytes.Add(value);
-                }
-            }
-
             BinaryFormatter formatter = new BinaryFormatter();
             FileStream fileStream = File.Open(filePath, FileMode.Open);
             SaveData saveData = (SaveData)formatter.Deserialize(fileStream);
@@ -300,12 +268,12 @@ public class ChunkManager : NetworkBehaviour
         // Restore player positions
         foreach (Player player in GameObject.FindObjectsOfType<Player>())
         {
-            player.transform.position = saveData.SpawnPosition.ToVector3Int();
+            player.Teleport(saveData.SpawnPosition.ToVector3Int());
             foreach (PlayerData playerData in saveData.Players)
             {
                 if (player.gameObject.name == playerData.Name)
                 {
-                    player.transform.position = playerData.Position.ToVector3();
+                    player.Teleport(playerData.Position.ToVector3());
                     player.transform.eulerAngles = new Vector3(0, playerData.Y, 0);
                     break;
                 }
@@ -368,7 +336,9 @@ public class ChunkManager : NetworkBehaviour
     public int IgnoreLayer;
     private ConcurrentQueue<Vector3Int> chunksToCreate = new ConcurrentQueue<Vector3Int>();
     public Vector3 SpawnPosition;
-
+    [HideInInspector]
+    public byte[] SaveDataBytes;
+    public ShareFile ShareFile;
     private void Awake()
     {
 
@@ -402,8 +372,6 @@ public class ChunkManager : NetworkBehaviour
         previousTargetPosition = Camera.main.transform.position;
         previousTargetRotation = Mathf.Round(Camera.main.transform.rotation.eulerAngles.y);
 
-        InvokeRepeating("GenerateChunkUpdate", 0, .1f);
-
 
         if (IsHost)
         {
@@ -421,8 +389,16 @@ public class ChunkManager : NetworkBehaviour
         }
         else
         {
-            LoadGameFromBytes(GetSaveByteArray(), false);
+            string WorldName = NetworkMenu.instance.currentLobby.Value.GetData("WorldName");
+            LoadGame(Application.dataPath + "/../" + "SaveCache/" + WorldName + ".dat");
         }
+
+        InvokeRepeating("GenerateChunkUpdate", 0, .1f);
+    }
+
+    public void SyncSave(ulong clientID)
+    {
+        ShareFile.SendFile(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat", "/../" + "SaveCache/", clientID);
     }
 
     private byte[,,] ConvertTo3DArray(List<byte> data, int sizeX, int sizeY, int sizeZ)

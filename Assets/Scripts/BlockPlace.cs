@@ -205,7 +205,7 @@ public class BlockPlace : NetworkBehaviour
     {
         foreach ((Vector3, byte) BlockEvent in BufferedBlockEvents)
         {
-            PlaceBlockServerRPC(BlockEvent.Item1, BlockEvent.Item2, false, false, NetworkManager.LocalClientId);
+            ChunkManager.Instance.SetVoxelAtWorldPosition(BlockEvent.Item1, BlockEvent.Item2, false, true);
         }
         ChunkManager.Instance.ClearChunks();
         BufferedBlockEvents.Clear();
@@ -219,6 +219,7 @@ public class BlockPlace : NetworkBehaviour
     [ClientRpc]
     void PlaceBlockClientRPC(Vector3 position, byte blockId, bool buffer, bool regenerate, ulong id)
     {
+        Debug.Log(NetworkManager.LocalClientId + " " + id);
         if (NetworkManager.LocalClientId != id)
         {
             ChunkManager.Instance.SetVoxelAtWorldPosition(position, blockId, regenerate, true);

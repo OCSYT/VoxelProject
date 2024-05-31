@@ -5149,7 +5149,7 @@ MonoBehaviour:
   BlockSize: 16
   mat: {fileID: 2100000, guid: 2514a85492453f347854dad59442c6e3, type: 2}
   transparent: {fileID: 2100000, guid: 438ebe16d49699246a667c1f3d8b599d, type: 2}
-  Daylength: 1
+  Daylength: 0.5
   GameTime: 45
   AmbientColor: {r: 0.48235294, g: 0.53333336, b: 0.7254902, a: 0}
   MinimumAmbient: 0.25
@@ -7907,7 +7907,7 @@ Light:
   m_Type: 1
   m_Shape: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 2
+  m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -7918,7 +7918,7 @@ Light:
     m_CustomResolution: -1
     m_Strength: 1
     m_Bias: 0.05
-    m_NormalBias: 0
+    m_NormalBias: 0.4
     m_NearPlane: 0.2
     m_CullingMatrixOverride:
       e00: 1

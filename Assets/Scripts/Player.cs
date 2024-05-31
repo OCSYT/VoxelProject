@@ -92,6 +92,19 @@ public class Player : NetworkBehaviour
                 StartCoroutine(InitSync(new List<(Vector3, byte)>()));
             }
             UsernameRoot.gameObject.SetActive(false);
+
+            RenderDistanceSlider.value = PlayerPrefs.GetInt("RenderDistance", 8);
+            SensitivitySlider.value = PlayerPrefs.GetFloat("Sensitivity", 100);
+
+            // Set the default graphics settings to high
+            graphicsToggle.isOn = PlayerPrefs.GetInt("Graphics", 1) == 1;
+            SetGraphicsSettings(graphicsToggle.isOn);
+
+            // Add listener to the toggle
+            graphicsToggle.onValueChanged.AddListener(delegate
+            {
+                SetGraphicsSettings(graphicsToggle.isOn);
+            });
         }
         else
         {
@@ -131,6 +144,17 @@ public class Player : NetworkBehaviour
         foreach (Player p in GameObject.FindObjectsOfType<Player>())
         {
             if (p.OwnerClientId == NetworkManager.LocalClientId)
+            {
+                return p;
+            }
+        }
+        return null;
+    }
+    public Player GetPlayerByName(string username)
+    {
+        foreach (Player p in GameObject.FindObjectsOfType<Player>())
+        {
+            if (p.Username.Value.ToString() == username)
             {
                 return p;
             }
@@ -190,19 +214,6 @@ public class Player : NetworkBehaviour
             Cursor.lockState = CursorLockMode.Locked;
             chunkManager.StartGenerating();
             StartCoroutine(WaitForInit());
-            RenderDistanceSlider.value = PlayerPrefs.GetInt("RenderDistance", 8);
-            SensitivitySlider.value = PlayerPrefs.GetFloat("Sensitivity", 100);
-
-            // Set the default graphics settings to high
-            graphicsToggle.isOn = PlayerPrefs.GetInt("Graphics", 1) == 1;
-            SetGraphicsSettings(graphicsToggle.isOn);
-
-            // Add listener to the toggle
-            graphicsToggle.onValueChanged.AddListener(delegate
-            {
-                SetGraphicsSettings(graphicsToggle.isOn);
-            });
-
         }
         if(Synced.Value == false)
         {
@@ -214,7 +225,6 @@ public class Player : NetworkBehaviour
     {
         AllowMovementInit = false;
         yield return new WaitUntil(() => chunkManager.SpawnPosition != Vector3.zero);
-        yield return new WaitForSeconds(3);
         AllowMovementInit = true;
         LoadingScreen.SetActive(false);
     }
@@ -245,7 +255,34 @@ public class Player : NetworkBehaviour
         }
     }
 
+    void SendChatMessageLocal(string message)
+    {
+        foreach (Player p in GameObject.FindObjectsOfType<Player>())
+        {
+            Transform chatContentTransform = p.ChatContent;
+            // Limit to 5 children
+            if (chatContentTransform.childCount >= 5)
+            {
+                Destroy(chatContentTransform.GetChild(0).gameObject);
+            }
 
+            // Instantiate the new chat message
+            TextMeshProUGUI Text = Instantiate(ChatPrefab, chatContentTransform).GetComponent<TextMeshProUGUI>();
+            Text.text = message;
+
+            // Start coroutine to delete the message after 60 seconds
+            Destroy(Text.gameObject, 60);
+        }
+    }
+
+    IEnumerator WaitForChunk()
+    {
+        AllowMovementInit = false;
+        yield return new WaitForSeconds(3);
+        AllowMovementInit = true;
+    }
+
+    Coroutine WaitForChunkCoroutine;
     void Update()
     {
         if(localPlayer == null)
@@ -265,14 +302,12 @@ public class Player : NetworkBehaviour
         Cursor.visible = Cursor.lockState != CursorLockMode.Locked;
 
 
-        if (RenderDistanceSlider.value != 8)
-        {
-            PlayerPrefs.SetInt("RenderDistance", (int)RenderDistanceSlider.value);
-        }
-        if (SensitivitySlider.value != 100)
-        {
-            PlayerPrefs.SetFloat("Sensitivity", SensitivitySlider.value);
-        }
+
+        PlayerPrefs.SetInt("RenderDistance", (int)RenderDistanceSlider.value);
+
+
+        PlayerPrefs.SetFloat("Sensitivity", SensitivitySlider.value);
+    
         RenderDistanceText.text = "Render Distance: " + RenderDistanceSlider.value;
         SensitivityText.text = "Sensitivity: " + SensitivitySlider.value / 100;
 
@@ -284,8 +319,19 @@ public class Player : NetworkBehaviour
         AllowMovement = PlayerInChunk && AllowMovementInit;
 
         controller.enabled = false;
+        if (PlayerInChunk == false)
+        {
+            if(WaitForChunkCoroutine != null)
+            {
+                StopCoroutine(WaitForChunkCoroutine);
+            }
+            WaitForChunkCoroutine = StartCoroutine(WaitForChunk());
+        }
         if (AllowMovement == false || AllowMovementInit == false) return;
-        controller.enabled = true;
+        if (controller.enabled == false)
+        {
+            controller.enabled = true;
+        }
 
 
 
@@ -305,12 +351,45 @@ public class Player : NetworkBehaviour
                 ChatCanvas.gameObject.SetActive(false);
                 Chatting = false;
 
-                if(ChatInput.text == "/spawn")
+                if (ChatInput.text == "/help")
+                {
+                    SendChatMessageLocal("<color=green>/spawn, tp {Username}</color>");
+                }
+                else if(ChatInput.text == "/spawn")
                 {
                     controller.enabled = false;
                     transform.position = chunkManager.SpawnPosition;
                     controller.enabled = true;
+                    SendChatMessageLocal("<color=green>Teleported!</color>");
                 }
+                else if (ChatInput.text.StartsWith("/tp "))
+                {
+                    string[] parts = ChatInput.text.Split(' ');
+                    if (parts.Length >= 2)
+                    {
+                        string username = parts[1];
+                        Player p = GetPlayerByName(username);
+                        if(p != null && username != this.Username.Value) {
+                            controller.enabled = false;
+                            transform.position = p.transform.position;
+                            controller.enabled = true;
+                            SendChatMessageLocal("<color=green>Teleported!</color>");
+                        }
+                        else
+                        {
+                            SendChatMessageLocal("<color=red>Invalid user " + username + "</color>");
+                        }
+                    }
+                    else
+                    {
+                        SendChatMessageLocal("<color=red>Invalid Syntax</color>");
+                    }
+                }
+                else if (ChatInput.text.StartsWith("/"))
+                {
+                    SendChatMessageLocal("<color=red>Invalid Syntax</color>");
+                }
+
 
                 else if (ChatInput.text != "")
                 {

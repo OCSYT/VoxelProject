@@ -14,6 +14,7 @@ public class Menu : MonoBehaviour
     public TMP_InputField WorldName;
     public GameObject SavePrefab;
     public Transform Content;
+    public Toggle superflattoggle;
     void Start()
     {
         WorldName.text = "New World";
@@ -78,6 +79,7 @@ public class Menu : MonoBehaviour
 
     public void StartGame()
     {
+        PlayerPrefs.SetInt("Superflat", superflattoggle.isOn ? 1 : 0);
         PlayerPrefs.SetInt("LoadingMode", 0);
         PlayerPrefs.SetString("WorldName", WorldName.text);
         PlayerPrefs.SetInt("Seed", Seed.text.GetHashCode());
@@ -101,6 +103,7 @@ public class Menu : MonoBehaviour
 
     public void LoadGame(string WorldName)
     {
+        PlayerPrefs.SetInt("Superflat", 0);
         PlayerPrefs.SetInt("LoadingMode", 1);
         PlayerPrefs.SetString("WorldName", WorldName);
         PlayerPrefs.SetInt("Seed", 0);

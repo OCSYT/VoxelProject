@@ -165,7 +165,7 @@ public class Chunk : MonoBehaviour
                     Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
 
                     // Check if current voxel is below water level and air
-                    if (voxelPosition.y <= ChunkManager.Instance.waterLevel && VoxelData[x, y, z] == BlockList["Air"])
+                    if (voxelPosition.y <= ChunkManager.Instance.waterLevel && voxelPosition.y > ChunkManager.Instance.worldFloor && VoxelData[x, y, z] == BlockList["Air"])
                     {
                         // Check if any neighboring voxel is water
                         bool hasWaterNeighbor = CheckForWaterNeighbor(x, y, z);
@@ -181,16 +181,17 @@ public class Chunk : MonoBehaviour
         });
 
         // Reverse pass
-        Parallel.For(0, ChunkSize, x =>
+        Parallel.For(0, ChunkSize, i =>
         {
+            int x = ChunkSize - 1 - i;
             for (int y = ChunkSize - 1; y >= 0; y--)
             {
-                for (int z = 0; z < ChunkSize; z++)
+                for (int z = ChunkSize - 1; z >= 0; z--)
                 {
                     Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
 
                     // Check if current voxel is below water level and air
-                    if (voxelPosition.y <= ChunkManager.Instance.waterLevel && VoxelData[x, y, z] == BlockList["Air"])
+                    if (voxelPosition.y <= ChunkManager.Instance.waterLevel && voxelPosition.y > ChunkManager.Instance.worldFloor  && VoxelData[x, y, z] == BlockList["Air"])
                     {
                         // Check if any neighboring voxel is water
                         bool hasWaterNeighbor = CheckForWaterNeighbor(x, y, z);
@@ -550,8 +551,8 @@ public class Chunk : MonoBehaviour
                         }
                     }
                 }
-                await Task.CompletedTask;
             }
+            await Task.CompletedTask;
         });
 
         if (isDestroyed)

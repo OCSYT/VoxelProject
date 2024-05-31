@@ -122,6 +122,7 @@ public class ChunkManager : NetworkBehaviour
     public class SaveData
     {
         public int Seed;
+        public bool IsSuperFlat;
         public SerializableVector3Int SpawnPosition;
         public float GameTime;
         public List<ChunkData> Chunks;
@@ -129,11 +130,12 @@ public class ChunkManager : NetworkBehaviour
 
         public SaveData() { }
 
-        public SaveData(int seed, float time, Vector3Int _SpawnPosition, Dictionary<Vector3Int, byte[,,]> chunkCache, List<PlayerData> players)
+        public SaveData(int seed, float time, bool flat, Vector3Int _SpawnPosition, Dictionary<Vector3Int, byte[,,]> chunkCache, List<PlayerData> players)
         {
             SpawnPosition = new SerializableVector3Int(_SpawnPosition);
             Seed = seed;
             GameTime = time;
+            IsSuperFlat = flat;
             Chunks = chunkCache.Select(kvp => new ChunkData(kvp.Key, kvp.Value)).ToList();
             Players = players;
         }
@@ -163,7 +165,7 @@ public class ChunkManager : NetworkBehaviour
         }
 
         // Create SaveData object
-        SaveData saveData = new SaveData(seed, GameTime, Vector3Int.FloorToInt(SpawnPosition), chunkCache, players);
+        SaveData saveData = new SaveData(seed, GameTime, IsSuperFlat, Vector3Int.FloorToInt(SpawnPosition), chunkCache, players);
 
 
 
@@ -269,6 +271,7 @@ public class ChunkManager : NetworkBehaviour
     {
         // Restore game state from SaveData object
         seed = saveData.Seed;
+        IsSuperFlat = saveData.IsSuperFlat;
 
         if (local)
         {
@@ -336,6 +339,7 @@ public class ChunkManager : NetworkBehaviour
     }
     public List<Block> Blocks = new List<Block>();
 
+    private bool IsSuperFlat;
     private int seed;
     public GameObject ChunkBorderPrefab;
     public bool ChunkBorders;
@@ -393,7 +397,7 @@ public class ChunkManager : NetworkBehaviour
     async public void StartGenerating()
     {
         seed = PlayerPrefs.GetInt("Seed", System.Guid.NewGuid().GetHashCode());
-
+        IsSuperFlat = PlayerPrefs.GetInt("Superflat", 0) == 1;
 
         previousTargetPosition = Camera.main.transform.position;
         previousTargetRotation = Mathf.Round(Camera.main.transform.rotation.eulerAngles.y);
@@ -409,7 +413,7 @@ public class ChunkManager : NetworkBehaviour
             }
             else
             {
-                SpawnPosition = await GetFirstLandPosition();
+                SpawnPosition = await GetFirstLandPosition(IsSuperFlat);
                 Player p = GameObject.FindObjectOfType<Player>();
                 p.transform.position = SpawnPosition;
                 SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
@@ -533,8 +537,9 @@ public class ChunkManager : NetworkBehaviour
         {
             GetHost().GameTime.Value = GameTime;
         }
-        float SkyValue = ((Mathf.Sin(GameTime * Daylength / 500) * 360)) % 360;
+        float SkyValue = (GameTime * Daylength) % 360;
         DirectionalLight.transform.rotation = Quaternion.Euler(SkyValue, 45, 0);
+
         DirectionalLight.intensity = 2 * Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up);
         RenderSettings.ambientLight = AmbientColor * Mathf.Clamp(Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up), MinimumAmbient, 1);
 
@@ -583,7 +588,7 @@ public class ChunkManager : NetworkBehaviour
         byte[,,] newData;
         if (!chunkCache.ContainsKey(chunkPosition))
         {
-            newData = SetTerrain(chunk);
+            newData = SetTerrain(chunk, IsSuperFlat);
         }
         else
         {
@@ -610,8 +615,8 @@ public class ChunkManager : NetworkBehaviour
     public float waterLevel = 10;
     public float height = 25;
     public float scale = 0.01f;
-
-
+    public int worldFloor = -100;
+    public int superflatHeight = 3;
 
     float Errosion(Vector3 position, float scale)
     {
@@ -658,8 +663,15 @@ public class ChunkManager : NetworkBehaviour
     }
 
 
-    async Task<Vector3> GetFirstLandPosition()
+    async Task<Vector3> GetFirstLandPosition(bool superflat)
     {
+
+        if (superflat)
+        {
+            int flatHeight = worldFloor + superflatHeight;
+            return new Vector3(0.5f, flatHeight + 2.5f, 0.5f);
+        }
+
         Vector3 FinalPos = Vector3.zero;
 
         await Task.Run(async () =>
@@ -693,8 +705,7 @@ public class ChunkManager : NetworkBehaviour
 
 
 
-
-    byte[,,] SetTerrain(Chunk chunk)
+    byte[,,] SetTerrain(Chunk chunk, bool superflat)
     {
         System.Random random = new System.Random(seed + (int)chunk.transform.position.x
             + (int)chunk.transform.position.y + (int)chunk.transform.position.z);
@@ -702,121 +713,151 @@ public class ChunkManager : NetworkBehaviour
         byte[,,] VoxelData = new byte[ChunkSize, ChunkSize, ChunkSize];
         Vector3 chunkCornerWorldPos = chunk.transform.position;
 
+        int flatHeight = worldFloor + superflatHeight;
+        if (superflat)
+        {
+            waterLevel = worldFloor;
+        }
 
         for (int x = 0; x < ChunkSize; x++)
         {
             for (int z = 0; z < ChunkSize; z++)
             {
-                Vector3 voxelPosition2D = chunkCornerWorldPos + new Vector3(x, 0, z);
-                float _Continentalness = Continentalness(voxelPosition2D, scale, 4, 0.5f, 2);
-                float _Errosion = Errosion(voxelPosition2D, scale / 5);
-
-                float perlinRaw = (_Continentalness * height) * _Errosion;
-
-                for (int y = 0; y < ChunkSize; y++)
+                if (superflat)
                 {
-                    Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
 
-                    byte voxelValue = 0;
-
-
-                    float perlinValue = perlinRaw;
-
-                    int perlinRounded = (Mathf.RoundToInt(perlinValue));
-
-                    int worldFloor = -100;
-
-
-                    if (voxelPosition.y > perlinRounded && voxelPosition.y <= waterLevel)
+                    for (int y = 0; y < ChunkSize; y++)
                     {
-                        voxelValue = BlockList["Water"];
-                    }
-                    else
-                    {
-                        if (voxelPosition.y == perlinRounded)
+                        byte voxelValue = 0;
+                        Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
+
+                        if (voxelPosition.y == worldFloor)
                         {
-                            if (voxelPosition.y == waterLevel)
+                            voxelValue = BlockList["Bedrock"];
+                        }
+                        else if (voxelPosition.y < flatHeight && voxelPosition.y > worldFloor)
+                        {
+                            voxelValue = BlockList["Dirt"];
+                        }
+                        else if (voxelPosition.y == flatHeight)
+                        {
+                            voxelValue = BlockList["Grass"];
+                        }
+
+                        VoxelData[x, y, z] = voxelValue;
+                    }
+                }
+                else
+                {
+                    Vector3 voxelPosition2D = chunkCornerWorldPos + new Vector3(x, 0, z);
+                    float _Continentalness = Continentalness(voxelPosition2D, scale, 4, 0.5f, 2);
+                    float _Errosion = Errosion(voxelPosition2D, scale / 5);
+
+                    float perlinRaw = (_Continentalness * height) * _Errosion;
+
+                    Parallel.For(0, ChunkSize, y =>
+                    {
+                        Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
+
+                        byte voxelValue = 0;
+
+                        float perlinValue = perlinRaw;
+
+                        int perlinRounded = (Mathf.RoundToInt(perlinValue));
+                        if (voxelPosition.y >= worldFloor)
+                        {
+                            if (voxelPosition.y > perlinRounded && voxelPosition.y <= waterLevel)
                             {
-                                voxelValue = BlockList["Sand"];
+                                voxelValue = BlockList["Water"];
                             }
                             else
                             {
-                                if (voxelPosition.y < waterLevel)
+                                if (voxelPosition.y == perlinRounded)
                                 {
-                                    voxelValue = BlockList["Sand"];
+                                    if (voxelPosition.y == waterLevel)
+                                    {
+                                        voxelValue = BlockList["Sand"];
+                                    }
+                                    else
+                                    {
+                                        if (voxelPosition.y < waterLevel)
+                                        {
+                                            voxelValue = BlockList["Sand"];
+                                        }
+                                        else
+                                        {
+                                            voxelValue = BlockList["Grass"]; //grass
+                                        }
+                                    }
                                 }
                                 else
                                 {
-                                    voxelValue = BlockList["Grass"]; //grass
+                                    if (voxelPosition.y < perlinRounded)
+                                    {
+                                        voxelValue = BlockList["Dirt"]; //dirt
+                                    }
+                                    if (voxelPosition.y < perlinRounded - 4)
+                                    {
+                                        voxelValue = BlockList["Stone"]; //stone
+                                    }
                                 }
                             }
                         }
-                        else
+                        if (voxelPosition.y == worldFloor)
                         {
-                            if (voxelPosition.y < perlinRounded)
-                            {
-                                voxelValue = BlockList["Dirt"]; //dirt
-                            }
-                            if (voxelPosition.y < perlinRounded - 4)
-                            {
-                                voxelValue = BlockList["Stone"]; //stone
-                            }
+                            voxelValue = BlockList["Bedrock"];
                         }
-                    }
-                    if (voxelPosition.y < worldFloor)
-                    {
-                        voxelValue = BlockList["Bedrock"];
-                    }
 
-                    VoxelData[x, y, z] = voxelValue;
+                        VoxelData[x, y, z] = voxelValue;
+                    });
                 }
             }
         }
 
-
-
-        for (int x = 0; x < ChunkSize; x++)
+        if (!superflat)
         {
-            for (int y = 0; y < ChunkSize; y++)
+            Parallel.For(0, ChunkSize, x =>
             {
-                for (int z = 0; z < ChunkSize; z++)
+                for (int y = 0; y < ChunkSize; y++)
                 {
-                    if (VoxelData[x, y, z] == BlockList["Grass"]) 
+                    for (int z = 0; z < ChunkSize; z++)
                     {
-
-                        if (y + 10 < ChunkSize && x + 2 < ChunkSize && z + 2 < ChunkSize
-                            && x - 2 > 0 && z - 2 > 0 
-                            && random.NextDouble() > .975f && !HasWoodNeighbor(VoxelData, x, y, z, 3))
+                        if (VoxelData[x, y, z] == BlockList["Grass"])
                         {
-                            for (int i = y + 1; i < y + 4; i++)
+                            if (y + 10 < ChunkSize && x + 2 < ChunkSize && z + 2 < ChunkSize
+                                && x - 2 > 0 && z - 2 > 0
+                                && random.NextDouble() > .975f && !HasWoodNeighbor(VoxelData, x, y, z, 3))
                             {
-                                if (VoxelData[x, i, z] == 0)
+                                for (int i = y + 1; i < y + 4; i++)
                                 {
-                                    VoxelData[x, i, z] = BlockList["Oak Log"];
-                                }
-                            }
-                            for (int offsetY = y + 4; offsetY < y + 8; offsetY++)
-                            {
-                                for (int offsetX = -2; offsetX <= 2; offsetX++)
-                                {
-                                    for (int offsetZ = -2; offsetZ <= 2; offsetZ++)
+                                    if (VoxelData[x, i, z] == 0)
                                     {
-                                        if (VoxelData[x + offsetX, offsetY, z + offsetZ] == 0)
+                                        VoxelData[x, i, z] = BlockList["Oak Log"];
+                                    }
+                                }
+                                for (int offsetY = y + 4; offsetY < y + 8; offsetY++)
+                                {
+                                    for (int offsetX = -2; offsetX <= 2; offsetX++)
+                                    {
+                                        for (int offsetZ = -2; offsetZ <= 2; offsetZ++)
                                         {
-                                            VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Leaves"];
+                                            if (VoxelData[x + offsetX, offsetY, z + offsetZ] == 0)
+                                            {
+                                                VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Leaves"];
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-
                 }
-            }
+            });
         }
 
         return VoxelData;
     }
+
 
 
     bool HasWoodNeighbor(byte[,,] voxelData, int x, int y, int z, int radius)

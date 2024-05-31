@@ -81,7 +81,7 @@ public class Menu : MonoBehaviour
         PlayerPrefs.SetInt("LoadingMode", 0);
         PlayerPrefs.SetString("WorldName", WorldName.text);
         PlayerPrefs.SetInt("Seed", Seed.text.GetHashCode());
-        SceneManager.LoadScene(1);
+        NetworkMenu.instance.Host();
     }
 
     public void DeleteSave(string WorldName)
@@ -104,7 +104,7 @@ public class Menu : MonoBehaviour
         PlayerPrefs.SetInt("LoadingMode", 1);
         PlayerPrefs.SetString("WorldName", WorldName);
         PlayerPrefs.SetInt("Seed", 0);
-        SceneManager.LoadScene(1);
+        NetworkMenu.instance.Host();
     }
 
     // Update is called once per frame

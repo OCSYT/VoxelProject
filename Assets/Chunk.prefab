@@ -1,0 +1,863 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &2721813383599794511
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3859331879935170013}
+  - component: {fileID: 2753970661924524256}
+  - component: {fileID: 2078053952036232181}
+  m_Layer: 0
+  m_Name: Directional Light
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3859331879935170013
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2721813383599794511}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.35355338, y: 0.35355338, z: -0.1464466, w: 0.8535535}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 531205616197827372}
+  m_LocalEulerAnglesHint: {x: 45, y: 45, z: 0}
+--- !u!108 &2753970661924524256
+Light:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2721813383599794511}
+  m_Enabled: 1
+  serializedVersion: 10
+  m_Type: 1
+  m_Shape: 0
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Intensity: 2
+  m_Range: 10
+  m_SpotAngle: 30
+  m_InnerSpotAngle: 21.80208
+  m_CookieSize: 10
+  m_Shadows:
+    m_Type: 2
+    m_Resolution: -1
+    m_CustomResolution: -1
+    m_Strength: 1
+    m_Bias: 0.05
+    m_NormalBias: 0
+    m_NearPlane: 0.2
+    m_CullingMatrixOverride:
+      e00: 1
+      e01: 0
+      e02: 0
+      e03: 0
+      e10: 0
+      e11: 1
+      e12: 0
+      e13: 0
+      e20: 0
+      e21: 0
+      e22: 1
+      e23: 0
+      e30: 0
+      e31: 0
+      e32: 0
+      e33: 1
+    m_UseCullingMatrixOverride: 0
+  m_Cookie: {fileID: 0}
+  m_DrawHalo: 0
+  m_Flare: {fileID: 0}
+  m_RenderMode: 0
+  m_CullingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_RenderingLayerMask: 1
+  m_Lightmapping: 4
+  m_LightShadowCasterMode: 0
+  m_AreaSize: {x: 1, y: 1}
+  m_BounceIntensity: 1
+  m_ColorTemperature: 6570
+  m_UseColorTemperature: 0
+  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_UseBoundingSphereOverride: 0
+  m_UseViewFrustumForShadowCasterCull: 1
+  m_ShadowRadius: 0
+  m_ShadowAngle: 0
+--- !u!114 &2078053952036232181
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2721813383599794511}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 0
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+--- !u!1 &3245299053783260293
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 531205616197827372}
+  - component: {fileID: 7580639700117365683}
+  - component: {fileID: 5898620697158843849}
+  m_Layer: 0
+  m_Name: Chunk
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &531205616197827372
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3245299053783260293}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 3859331879935170013}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7580639700117365683
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3245299053783260293}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6aa0f0b17cddcf44482a07ca6e67a67c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  terrainCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0.0041666627
+      value: 0.16965126
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.3056297
+      value: 0.44387716
+      inSlope: 0.025847532
+      outSlope: 0.025847532
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.59917694
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 0.35903254
+      value: 0.75829303
+      inSlope: -0.0054894937
+      outSlope: -0.0054894937
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.5490569
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 2
+      outSlope: 2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  Blocks:
+  - Name: Air
+    Value: 0
+    FrontFace: 0
+    BackFace: 0
+    LeftFace: 0
+    RightFace: 0
+    TopFace: 0
+    BottomFace: 0
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Grass
+    Value: 1
+    FrontFace: 255
+    BackFace: 255
+    LeftFace: 255
+    RightFace: 255
+    TopFace: 0
+    BottomFace: 1
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Dirt
+    Value: 2
+    FrontFace: 1
+    BackFace: 1
+    LeftFace: 1
+    RightFace: 1
+    TopFace: 1
+    BottomFace: 1
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Stone
+    Value: 3
+    FrontFace: 2
+    BackFace: 2
+    LeftFace: 2
+    RightFace: 2
+    TopFace: 2
+    BottomFace: 2
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Cobblestone
+    Value: 4
+    FrontFace: 3
+    BackFace: 3
+    LeftFace: 3
+    RightFace: 3
+    TopFace: 3
+    BottomFace: 3
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Mossy Cobblestone
+    Value: 45
+    FrontFace: 244
+    BackFace: 244
+    LeftFace: 244
+    RightFace: 244
+    TopFace: 244
+    BottomFace: 244
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Snow Grass
+    Value: 45
+    FrontFace: 254
+    BackFace: 254
+    LeftFace: 254
+    RightFace: 254
+    TopFace: 11
+    BottomFace: 1
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Snow
+    Value: 45
+    FrontFace: 11
+    BackFace: 11
+    LeftFace: 11
+    RightFace: 11
+    TopFace: 11
+    BottomFace: 11
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Ice
+    Value: 45
+    FrontFace: 12
+    BackFace: 12
+    LeftFace: 12
+    RightFace: 12
+    TopFace: 12
+    BottomFace: 12
+    Transparent: 1
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Stone Bricks
+    Value: 5
+    FrontFace: 4
+    BackFace: 4
+    LeftFace: 4
+    RightFace: 4
+    TopFace: 4
+    BottomFace: 4
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Bricks
+    Value: 45
+    FrontFace: 20
+    BackFace: 20
+    LeftFace: 20
+    RightFace: 20
+    TopFace: 20
+    BottomFace: 20
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Stone Slab
+    Value: 45
+    FrontFace: 19
+    BackFace: 19
+    LeftFace: 19
+    RightFace: 19
+    TopFace: 19
+    BottomFace: 19
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Oak Planks
+    Value: 6
+    FrontFace: 5
+    BackFace: 5
+    LeftFace: 5
+    RightFace: 5
+    TopFace: 5
+    BottomFace: 5
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Oak Log
+    Value: 7
+    FrontFace: 6
+    BackFace: 6
+    LeftFace: 6
+    RightFace: 6
+    TopFace: 253
+    BottomFace: 253
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Leaves
+    Value: 8
+    FrontFace: 7
+    BackFace: 7
+    LeftFace: 7
+    RightFace: 7
+    TopFace: 7
+    BottomFace: 7
+    Transparent: 1
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Glass
+    Value: 9
+    FrontFace: 8
+    BackFace: 8
+    LeftFace: 8
+    RightFace: 8
+    TopFace: 8
+    BottomFace: 8
+    Transparent: 1
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Glowstone
+    Value: 10
+    FrontFace: 9
+    BackFace: 9
+    LeftFace: 9
+    RightFace: 9
+    TopFace: 9
+    BottomFace: 9
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 1.4980394, g: 1.4980394, b: 1.4980394, a: 1}
+  - Name: Sand
+    Value: 11
+    FrontFace: 10
+    BackFace: 10
+    LeftFace: 10
+    RightFace: 10
+    TopFace: 10
+    BottomFace: 10
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Gravel
+    Value: 45
+    FrontFace: 243
+    BackFace: 243
+    LeftFace: 243
+    RightFace: 243
+    TopFace: 243
+    BottomFace: 243
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Lava
+    Value: 15
+    FrontFace: 14
+    BackFace: 14
+    LeftFace: 14
+    RightFace: 14
+    TopFace: 14
+    BottomFace: 14
+    Transparent: 0
+    NoCollision: 1
+    Light: {r: 1, g: 0, b: 0, a: 1}
+  - Name: Water
+    Value: 16
+    FrontFace: 15
+    BackFace: 15
+    LeftFace: 15
+    RightFace: 15
+    TopFace: 15
+    BottomFace: 15
+    Transparent: 1
+    NoCollision: 1
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Crafting Table
+    Value: 17
+    FrontFace: 28
+    BackFace: 29
+    LeftFace: 28
+    RightFace: 29
+    TopFace: 44
+    BottomFace: 44
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Furnace
+    Value: 18
+    FrontFace: 45
+    BackFace: 46
+    LeftFace: 46
+    RightFace: 46
+    TopFace: 31
+    BottomFace: 31
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Coal Ore
+    Value: 19
+    FrontFace: 250
+    BackFace: 250
+    LeftFace: 250
+    RightFace: 250
+    TopFace: 250
+    BottomFace: 250
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Iron Ore
+    Value: 20
+    FrontFace: 249
+    BackFace: 249
+    LeftFace: 249
+    RightFace: 249
+    TopFace: 249
+    BottomFace: 249
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Goal Ore
+    Value: 21
+    FrontFace: 248
+    BackFace: 248
+    LeftFace: 248
+    RightFace: 248
+    TopFace: 248
+    BottomFace: 248
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Lapis Lazuli
+    Value: 22
+    FrontFace: 247
+    BackFace: 247
+    LeftFace: 247
+    RightFace: 247
+    TopFace: 247
+    BottomFace: 247
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Redstone Ore
+    Value: 23
+    FrontFace: 252
+    BackFace: 252
+    LeftFace: 252
+    RightFace: 252
+    TopFace: 252
+    BottomFace: 252
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Emerald Ore
+    Value: 31
+    FrontFace: 246
+    BackFace: 246
+    LeftFace: 246
+    RightFace: 246
+    TopFace: 246
+    BottomFace: 246
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Diamond Ore
+    Value: 24
+    FrontFace: 251
+    BackFace: 251
+    LeftFace: 251
+    RightFace: 251
+    TopFace: 251
+    BottomFace: 251
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Lapis Block
+    Value: 25
+    FrontFace: 234
+    BackFace: 234
+    LeftFace: 234
+    RightFace: 234
+    TopFace: 234
+    BottomFace: 234
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Redstone Block
+    Value: 26
+    FrontFace: 239
+    BackFace: 239
+    LeftFace: 239
+    RightFace: 239
+    TopFace: 239
+    BottomFace: 239
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Iron Block
+    Value: 27
+    FrontFace: 235
+    BackFace: 235
+    LeftFace: 235
+    RightFace: 235
+    TopFace: 235
+    BottomFace: 235
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Gold Block
+    Value: 28
+    FrontFace: 236
+    BackFace: 236
+    LeftFace: 236
+    RightFace: 236
+    TopFace: 236
+    BottomFace: 236
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Emerald Block
+    Value: 29
+    FrontFace: 238
+    BackFace: 238
+    LeftFace: 238
+    RightFace: 238
+    TopFace: 238
+    BottomFace: 238
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Diamond Block
+    Value: 30
+    FrontFace: 237
+    BackFace: 237
+    LeftFace: 237
+    RightFace: 237
+    TopFace: 237
+    BottomFace: 237
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: White Wool
+    Value: 31
+    FrontFace: 272
+    BackFace: 272
+    LeftFace: 272
+    RightFace: 272
+    TopFace: 272
+    BottomFace: 272
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Light Gray Wool
+    Value: 32
+    FrontFace: 288
+    BackFace: 288
+    LeftFace: 288
+    RightFace: 288
+    TopFace: 288
+    BottomFace: 288
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Grey Wool
+    Value: 33
+    FrontFace: 304
+    BackFace: 304
+    LeftFace: 304
+    RightFace: 304
+    TopFace: 304
+    BottomFace: 304
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Black Wool
+    Value: 34
+    FrontFace: 64
+    BackFace: 64
+    LeftFace: 64
+    RightFace: 64
+    TopFace: 64
+    BottomFace: 64
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Brown Wool
+    Value: 35
+    FrontFace: 80
+    BackFace: 80
+    LeftFace: 80
+    RightFace: 80
+    TopFace: 80
+    BottomFace: 80
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Red Wool
+    Value: 36
+    FrontFace: 96
+    BackFace: 96
+    LeftFace: 96
+    RightFace: 96
+    TopFace: 96
+    BottomFace: 96
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Orange Wool
+    Value: 36
+    FrontFace: 112
+    BackFace: 112
+    LeftFace: 112
+    RightFace: 112
+    TopFace: 112
+    BottomFace: 112
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Yellow Wool
+    Value: 37
+    FrontFace: 128
+    BackFace: 128
+    LeftFace: 128
+    RightFace: 128
+    TopFace: 128
+    BottomFace: 128
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Lime Wool
+    Value: 38
+    FrontFace: 144
+    BackFace: 144
+    LeftFace: 144
+    RightFace: 144
+    TopFace: 144
+    BottomFace: 144
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Green Wool
+    Value: 39
+    FrontFace: 160
+    BackFace: 160
+    LeftFace: 160
+    RightFace: 160
+    TopFace: 160
+    BottomFace: 160
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Cyan Wool
+    Value: 40
+    FrontFace: 176
+    BackFace: 176
+    LeftFace: 176
+    RightFace: 176
+    TopFace: 176
+    BottomFace: 176
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Light Blue Wool
+    Value: 41
+    FrontFace: 192
+    BackFace: 192
+    LeftFace: 192
+    RightFace: 192
+    TopFace: 192
+    BottomFace: 192
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Blue Wool
+    Value: 42
+    FrontFace: 208
+    BackFace: 208
+    LeftFace: 208
+    RightFace: 208
+    TopFace: 208
+    BottomFace: 208
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Purple Wool
+    Value: 43
+    FrontFace: 224
+    BackFace: 224
+    LeftFace: 224
+    RightFace: 224
+    TopFace: 224
+    BottomFace: 224
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Magenta Wool
+    Value: 44
+    FrontFace: 240
+    BackFace: 240
+    LeftFace: 240
+    RightFace: 240
+    TopFace: 240
+    BottomFace: 240
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Pink Wool
+    Value: 45
+    FrontFace: 17
+    BackFace: 17
+    LeftFace: 17
+    RightFace: 17
+    TopFace: 17
+    BottomFace: 17
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: TNT
+    Value: 45
+    FrontFace: 21
+    BackFace: 21
+    LeftFace: 21
+    RightFace: 21
+    TopFace: 22
+    BottomFace: 23
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Obsidian
+    Value: 45
+    FrontFace: 241
+    BackFace: 241
+    LeftFace: 241
+    RightFace: 241
+    TopFace: 241
+    BottomFace: 241
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Bedrock
+    Value: 45
+    FrontFace: 242
+    BackFace: 242
+    LeftFace: 242
+    RightFace: 242
+    TopFace: 242
+    BottomFace: 242
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Bookshelf
+    Value: 45
+    FrontFace: 245
+    BackFace: 245
+    LeftFace: 245
+    RightFace: 245
+    TopFace: 5
+    BottomFace: 5
+    Transparent: 0
+    NoCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  ChunkBorderPrefab: {fileID: 6104295362550119401, guid: b2a1684a706b6a845ade531b06670eda,
+    type: 3}
+  ChunkBorders: 0
+  renderDistance: 8
+  ChunkSize: 16
+  TextureSize: 256
+  BlockSize: 16
+  mat: {fileID: 2100000, guid: 2514a85492453f347854dad59442c6e3, type: 2}
+  transparent: {fileID: 2100000, guid: 438ebe16d49699246a667c1f3d8b599d, type: 2}
+  Daylength: 1
+  GameTime: 45
+  AmbientColor: {r: 0.48235294, g: 0.53333336, b: 0.7254902, a: 0}
+  MinimumAmbient: 0.25
+  IgnoreLayer: 2
+  SpawnPosition: {x: 0, y: 0, z: 0}
+  waterLevel: 10
+  height: 400
+  scale: 0.005
+--- !u!114 &5898620697158843849
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3245299053783260293}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 951099334
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1

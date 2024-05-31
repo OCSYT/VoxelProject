@@ -10,8 +10,9 @@ using System.Threading.Tasks;
 using UnityEngine;
 using System.Xml.Serialization;
 using Newtonsoft.Json;
+using Unity.Netcode;
 
-public class ChunkManager : MonoBehaviour
+public class ChunkManager : NetworkBehaviour
 {
 
     public AnimationCurve terrainCurve;
@@ -80,7 +81,7 @@ public class ChunkManager : MonoBehaviour
 
         public PlayerData() { }
 
-        public PlayerData(string name, Vector3Int position, float y)
+        public PlayerData(string name, Vector3 position, float y)
         {
             Name = name;
             Position = new SerializableVector3(position);
@@ -128,7 +129,7 @@ public class ChunkManager : MonoBehaviour
 
         public SaveData() { }
 
-        public SaveData(int seed, float time, Vector3Int _SpawnPosition,  Dictionary<Vector3Int, byte[,,]> chunkCache, List<PlayerData> players)
+        public SaveData(int seed, float time, Vector3Int _SpawnPosition, Dictionary<Vector3Int, byte[,,]> chunkCache, List<PlayerData> players)
         {
             SpawnPosition = new SerializableVector3Int(_SpawnPosition);
             Seed = seed;
@@ -139,101 +140,178 @@ public class ChunkManager : MonoBehaviour
     }
 
 
+    public Player GetHost()
+    {
+        foreach(Player p in GameObject.FindObjectsOfType<Player>())
+        {
+            if (p.Hosting.Value)
+            {
+                return p;
+            }
+        }
+        return null;
+    }
+
     public void SaveGame(string filePath)
     {
-        // Collect player data
         List<PlayerData> players = new List<PlayerData>();
         foreach (var player in GameObject.FindObjectsOfType<Player>())
         {
             string playerName = player.gameObject.name;
-            Vector3Int playerPosition = Vector3Int.FloorToInt(player.transform.position);
+            Vector3 playerPosition = (player.transform.position);
             players.Add(new PlayerData(playerName, playerPosition, player.transform.eulerAngles.y));
         }
 
         // Create SaveData object
-        SaveData saveData = new SaveData(seed, GameTime, Vector3Int.FloorToInt(SpawnPosition)   , chunkCache, players);
+        SaveData saveData = new SaveData(seed, GameTime, Vector3Int.FloorToInt(SpawnPosition), chunkCache, players);
 
-        // Serialize the SaveData object to JSON
-        string jsonString = JsonConvert.SerializeObject(saveData, Formatting.Indented);
 
-        // Ensure the directory exists
+
+        // Serialize the SaveData object to binary
+        byte[] saveDataBytes;
+        using (MemoryStream memoryStream = new MemoryStream())
+        {
+            BinaryFormatter formatter = new BinaryFormatter();
+            formatter.Serialize(memoryStream, saveData);
+            saveDataBytes = memoryStream.ToArray();
+        }
+
+        // Write the byte array to the file
         string directoryPath = Path.GetDirectoryName(filePath);
         if (!Directory.Exists(directoryPath))
         {
             Directory.CreateDirectory(directoryPath);
         }
 
-        // Write the JSON string to the file
-        File.WriteAllText(filePath, jsonString);
+        File.WriteAllBytes(filePath, saveDataBytes);
 
+        Player p = GetHost();
+        if (IsHost)
+        {
+            p.NetworkSaveDataBytes.Clear();
+            foreach (byte value in saveDataBytes)
+            {
+                p.NetworkSaveDataBytes.Add(value);
+            }
+        }
         Debug.Log("Game saved successfully!");
     }
 
+    public byte[] GetSaveByteArray()
+    {
+        Player p = GetHost();
+        byte[] saveDataBytes = new byte[p.NetworkSaveDataBytes.Count];
+        for (int i = 0; i < saveDataBytes.Length; i++)
+        {
+            saveDataBytes[i] = p.NetworkSaveDataBytes[i];
+        }
+        return saveDataBytes;
+    }
+
+    public void LoadGameFromBytes(byte[] saveDataBytes, bool local)
+    {
+        if (saveDataBytes != null && saveDataBytes.Length > 0)
+        {
+
+            SaveData saveData;
+            using (MemoryStream memoryStream = new MemoryStream(saveDataBytes))
+            {
+                BinaryFormatter formatter = new BinaryFormatter();
+                saveData = (SaveData)formatter.Deserialize(memoryStream);
+            }
+
+            LoadGameWithSaveData(saveData, false);
+        }
+        else
+        {
+            Debug.LogError("Invalid save data byte array!");
+        }
+    }
 
 
     public void LoadGame(string filePath)
     {
         if (File.Exists(filePath))
         {
-            // Read the JSON string from the file
-            string jsonString = File.ReadAllText(filePath);
-
-            // Deserialize the JSON string to a SaveData object
-            SaveData saveData = JsonConvert.DeserializeObject<SaveData>(jsonString);
-
-            // Restore seed
-            seed = saveData.Seed;
-            GameTime = saveData.GameTime;
-            SpawnPosition = (saveData.SpawnPosition.ToVector3Int());
-
-            // Clear current chunks
-            foreach (var chunkPosition in activeChunksObj.Keys.ToList())
+            // Read the binary data from the file
+            Player p = GetHost();
+            if (IsHost)
             {
-                Destroy(activeChunksObj[chunkPosition]);
-            }
-            activeChunks.Clear();
-            activeChunksObj.Clear();
-
-            // Load chunk data
-            chunkCache = saveData.Chunks.ToDictionary(
-                chunk => chunk.Position.ToVector3Int(),
-                chunk => ConvertTo3DArray(chunk.Data, ChunkSize, ChunkSize, ChunkSize)
-            );
-
-            // Regenerate chunks based on loaded data
-            foreach (var chunk in chunkCache.Keys)
-            {
-                CreateChunk(chunk);
-            }
-
-            // Restore player positions
-
-            foreach(Player p in GameObject.FindObjectsOfType<Player>())
-            {
-                p.transform.position = SpawnPosition;
-            }
-
-            foreach (var playerData in saveData.Players)
-            {
-                foreach (Player p in GameObject.FindObjectsOfType<Player>())
+                byte[] saveDataBytes = File.ReadAllBytes(filePath);
+                p.NetworkSaveDataBytes.Clear();
+                foreach (byte value in saveDataBytes)
                 {
-                    if(p.gameObject.name == playerData.Name)
-                    {
-                        p.transform.position = (Vector3)(playerData.Position.ToVector3());
-                        p.transform.eulerAngles = new Vector3(0, playerData.Y, 0);
-                        break;
-                    }
+                    p.NetworkSaveDataBytes.Add(value);
                 }
             }
 
-            Debug.Log("Game loaded successfully!");
-        }
-        else
-        {
-            Debug.LogError("Save file not found!");
+            BinaryFormatter formatter = new BinaryFormatter();
+            FileStream fileStream = File.Open(filePath, FileMode.Open);
+            SaveData saveData = (SaveData)formatter.Deserialize(fileStream);
+
+            fileStream.Close();
+
+            LoadGameWithSaveData(saveData, true);
         }
     }
 
+    public void ClearChunks()
+    {
+        foreach (var chunkPosition in activeChunksObj.Keys.ToList())
+        {
+            Destroy(activeChunksObj[chunkPosition]);
+        }
+        activeChunks.Clear();
+        activeChunksObj.Clear();
+    }
+
+    void LoadGameWithSaveData(SaveData saveData, bool local)
+    {
+        // Restore game state from SaveData object
+        seed = saveData.Seed;
+
+        if (local)
+        {
+            GameTime = saveData.GameTime;
+        }
+        else
+        {
+            GameTime = GetHost().GameTime.Value;
+        }
+
+        // Clear current chunks
+        ClearChunks();
+
+        // Load chunk data
+        chunkCache = saveData.Chunks.ToDictionary(
+            chunk => chunk.Position.ToVector3Int(),
+            chunk => ConvertTo3DArray(chunk.Data, ChunkSize, ChunkSize, ChunkSize)
+        );
+
+        // Regenerate chunks based on loaded data
+        foreach (var chunk in chunkCache.Keys)
+        {
+            CreateChunk(chunk);
+        }
+
+        // Restore player positions
+        foreach (Player player in GameObject.FindObjectsOfType<Player>())
+        {
+            player.transform.position = saveData.SpawnPosition.ToVector3Int();
+            foreach (PlayerData playerData in saveData.Players)
+            {
+                if (player.gameObject.name == playerData.Name)
+                {
+                    player.transform.position = playerData.Position.ToVector3();
+                    player.transform.eulerAngles = new Vector3(0, playerData.Y, 0);
+                    break;
+                }
+            }
+        }
+        SpawnPosition = saveData.SpawnPosition.ToVector3Int();
+
+        Debug.Log("Game loaded successfully!");
+    }
 
 
 
@@ -262,7 +340,6 @@ public class ChunkManager : MonoBehaviour
     public GameObject ChunkBorderPrefab;
     public bool ChunkBorders;
     public int renderDistance = 5;
-    public Transform target;
     public int ChunkSize;
     public float TextureSize = 256;
     public float BlockSize = 16;
@@ -287,11 +364,12 @@ public class ChunkManager : MonoBehaviour
     public int IgnoreLayer;
     private ConcurrentQueue<Vector3Int> chunksToCreate = new ConcurrentQueue<Vector3Int>();
     public Vector3 SpawnPosition;
-    async void Awake()
+
+    private void Awake()
     {
-        seed = PlayerPrefs.GetInt("Seed", System.Guid.NewGuid().GetHashCode());
 
 
+        DirectionalLight = GameObject.FindObjectOfType<Light>();
         int index = 0;
         foreach (var block in Blocks)
         {
@@ -310,25 +388,36 @@ public class ChunkManager : MonoBehaviour
             BlockFaces.Add(block.Value, new int[] { block.FrontFace, block.BackFace, block.LeftFace, block.RightFace, block.TopFace, block.BottomFace });
         }
 
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        previousTargetPosition = target.position;
-        previousTargetRotation = Mathf.Round(target.rotation.eulerAngles.y);
-        DirectionalLight = GameObject.FindObjectOfType<Light>();
+    }
+
+    async public void StartGenerating()
+    {
+        seed = PlayerPrefs.GetInt("Seed", System.Guid.NewGuid().GetHashCode());
+
+
+        previousTargetPosition = Camera.main.transform.position;
+        previousTargetRotation = Mathf.Round(Camera.main.transform.rotation.eulerAngles.y);
+
         InvokeRepeating("GenerateChunkUpdate", 0, .1f);
 
 
-        if (PlayerPrefs.GetInt("LoadingMode", 0) == 1)
+        if (IsHost)
         {
-            LoadGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
+            if (PlayerPrefs.GetInt("LoadingMode", 0) == 1)
+            {
+                LoadGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
+            }
+            else
+            {
+                SpawnPosition = await GetFirstLandPosition();
+                Player p = GameObject.FindObjectOfType<Player>();
+                p.transform.position = SpawnPosition;
+                SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
+            }
         }
         else
         {
-            SpawnPosition = await GetFirstLandPosition();
-            Player p = GameObject.FindObjectOfType<Player>();
-            p.transform.position = SpawnPosition;
+            LoadGameFromBytes(GetSaveByteArray(), false);
         }
     }
 
@@ -354,7 +443,7 @@ public class ChunkManager : MonoBehaviour
     bool cancelledGeneration = false;
     async void GenerateChunkUpdate()
     {
-        Vector3 targetPosition = target.position;
+        Vector3 targetPosition = Camera.main.transform.position;
         await Task.Run(async () =>
         {
 
@@ -432,23 +521,25 @@ public class ChunkManager : MonoBehaviour
     {
 
 
-        if (Vector3.Distance(target.position, previousTargetPosition) > ChunkSize || previousTargetRotation != Mathf.Round(target.rotation.eulerAngles.y))
+        if (Vector3.Distance(Camera.main.transform.position, previousTargetPosition) > ChunkSize || previousTargetRotation != Mathf.Round(Camera.main.transform.rotation.eulerAngles.y))
         {
-            previousTargetPosition = target.position;
-            previousTargetRotation = Mathf.Round(target.rotation.eulerAngles.y);
+            previousTargetPosition = Camera.main.transform.position;
+            previousTargetRotation = Mathf.Round(Camera.main.transform.rotation.eulerAngles.y);
             cancelledGeneration = true;
         }
 
         GameTime += Time.deltaTime;
+        if (IsHost)
+        {
+            GetHost().GameTime.Value = GameTime;
+        }
         float SkyValue = ((Mathf.Sin(GameTime * Daylength / 500) * 360)) % 360;
         DirectionalLight.transform.rotation = Quaternion.Euler(SkyValue, 45, 0);
         DirectionalLight.intensity = 2 * Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up);
         RenderSettings.ambientLight = AmbientColor * Mathf.Clamp(Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up), MinimumAmbient, 1);
 
-        if (Instance == null)
-        {
-            Instance = this;
-        }
+
+        Instance = this;
 
 
         while (chunksToCreate.TryDequeue(out Vector3Int chunkPosition))
@@ -463,6 +554,8 @@ public class ChunkManager : MonoBehaviour
 
     private bool generatingChunks = false;
 
+
+
     private void CreateChunk(Vector3Int chunkPosition)
     {
         if (activeChunks.ContainsKey(chunkPosition))
@@ -471,8 +564,9 @@ public class ChunkManager : MonoBehaviour
         GameObject newChunk = new GameObject
         {
             name = $"{chunkPosition.x}_{chunkPosition.y}_{chunkPosition.z}",
-            transform = { position = chunkPosition * ChunkSize }
+            transform = { position = chunkPosition * ChunkSize, parent = transform },
         };
+
 
         if (ChunkBorders)
         {
@@ -496,6 +590,16 @@ public class ChunkManager : MonoBehaviour
             newData = chunkCache[chunkPosition];
         }
         chunk.SetData(newData);
+
+        if (voxelDataForNonExistentChunks.ContainsKey(chunkPosition))
+        {
+            foreach (var voxelData in voxelDataForNonExistentChunks[chunkPosition])
+            {
+                chunk.SetVoxel(voxelData.Item1.x, voxelData.Item1.y, voxelData.Item1.z, voxelData.Item2);
+            }
+            voxelDataForNonExistentChunks.Remove(chunkPosition);
+        }
+
         chunk.GenerateTerrain();
     }
 
@@ -765,6 +869,8 @@ public class ChunkManager : MonoBehaviour
 
 
 
+    private Dictionary<Vector3Int, List<(Vector3Int, byte)>> voxelDataForNonExistentChunks = new Dictionary<Vector3Int, List<(Vector3Int, byte)>>();
+
     public void SetVoxelAtWorldPosition(Vector3 worldPosition, byte voxelValue, bool regenerate, bool useCache)
     {
         Vector3Int chunkPosition = new Vector3Int(
@@ -773,38 +879,40 @@ public class ChunkManager : MonoBehaviour
             Mathf.FloorToInt(worldPosition.z / ChunkSize)
         );
 
+        int localX = Mathf.FloorToInt(worldPosition.x) % ChunkSize;
+        int localY = Mathf.FloorToInt(worldPosition.y) % ChunkSize;
+        int localZ = Mathf.FloorToInt(worldPosition.z) % ChunkSize;
+
+        // Ensure local position is non-negative
+        localX = (localX + ChunkSize) % ChunkSize;
+        localY = (localY + ChunkSize) % ChunkSize;
+        localZ = (localZ + ChunkSize) % ChunkSize;
+
+        Vector3Int localVoxelPosition = new Vector3Int(localX, localY, localZ);
 
         if (activeChunks.ContainsKey(chunkPosition))
         {
             Chunk chunk = activeChunks[chunkPosition];
-            Vector3 localPosition = chunk.transform.InverseTransformPoint(worldPosition);
 
-
-            int voxelX = Mathf.FloorToInt(localPosition.x);
-            int voxelY = Mathf.FloorToInt(localPosition.y);
-            int voxelZ = Mathf.FloorToInt(localPosition.z);
-
-            chunk.SetVoxel(voxelX, voxelY, voxelZ, voxelValue);
+            chunk.SetVoxel(localVoxelPosition.x, localVoxelPosition.y, localVoxelPosition.z, voxelValue);
 
             if (regenerate)
             {
                 chunk.GenerateTerrain();
             }
+
             if (useCache)
             {
-                if (!chunkCache.ContainsKey(chunkPosition))
-                {
-                    chunkCache[chunkPosition] = chunk.GetData();
-                }
-                else
-                {
-                    chunkCache[chunkPosition] = chunk.GetData();
-                }
+                chunkCache[chunkPosition] = chunk.GetData();
             }
         }
         else
         {
-            Debug.LogWarning("Chunk at position " + chunkPosition + " is not active.");
+            if (!voxelDataForNonExistentChunks.ContainsKey(chunkPosition))
+            {
+                voxelDataForNonExistentChunks[chunkPosition] = new List<(Vector3Int, byte)>();
+            }
+            voxelDataForNonExistentChunks[chunkPosition].Add((localVoxelPosition, voxelValue));
         }
     }
 
@@ -878,7 +986,7 @@ public class ChunkManager : MonoBehaviour
 
         var chunksToRemove = new ConcurrentBag<Vector3Int>();
 
-        Vector3 TargetPos = target.position;
+        Vector3 TargetPos = Camera.main.transform.position;
 
         // Use Parallel.For to iterate over the chunks
         Parallel.For(0, chunkKeys.Count, i =>

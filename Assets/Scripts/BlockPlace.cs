@@ -1,8 +1,11 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.UIElements;
 
-public class BlockPlace : MonoBehaviour
+public class BlockPlace : NetworkBehaviour
 {
     public float Dist = 25;
     public List<string> IgnoreBlocks = new List<string> { "air", "water", "lava" };
@@ -18,8 +21,12 @@ public class BlockPlace : MonoBehaviour
     public float BlockSize;
     public Player player;
     public Transform blockPreview;
-    void Start()
+
+    [HideInInspector]
+    public List<(Vector3, byte)> BufferedBlockEvents = new List<(Vector3, byte) > ();
+    private IEnumerator Start()
     {
+        yield return new WaitUntil(() => ChunkManager.Instance != null);
         chunkManager = ChunkManager.Instance;
         if (blockList == null)
         {
@@ -30,7 +37,10 @@ public class BlockPlace : MonoBehaviour
                 blockList.Add(new Block(item.Key, item.Value));
             }
         }
-        UpdateBlockVisual();
+        if (IsOwner)
+        {
+            UpdateBlockVisual();
+        }
     }
 
     private string FindKeyFromValue(Dictionary<string, byte> dictionary, byte value)
@@ -70,6 +80,7 @@ public class BlockPlace : MonoBehaviour
 
     void Update()
     {
+        if (IsOwner == false) return;
         if (player.isPaused || !player.AllowMovement) return;
         float scroll = Input.GetAxis("Mouse ScrollWheel");
 
@@ -130,7 +141,14 @@ public class BlockPlace : MonoBehaviour
             {
 
                 Vector3 targetPosition = hit.point - hit.normal / 2f;
-                PlaceBlock(targetPosition, 0);
+                if (IsHost)
+                {
+                    PlaceBlockServerRPC(targetPosition, 0, true, true);
+                }
+                else
+                {
+                    PlaceBlockServerRPC(targetPosition, 0, false, true);
+                }
             }
         }
         if (Input.GetMouseButtonDown(1))
@@ -145,26 +163,53 @@ public class BlockPlace : MonoBehaviour
                 RaycastHit PlayerRay;
                 if (!Physics.SphereCast(hit.point - hit.normal, 1f, hit.normal, out PlayerRay, 1f, playerLayer))
                 {
-                    PlaceBlock(targetPosition, blockList[selectedBlockIndex].blockId);
+                    if (IsHost)
+                    {
+                        PlaceBlockServerRPC(targetPosition, blockList[selectedBlockIndex].blockId, true, true);
+                    }
+                    else
+                    {
+                        PlaceBlockServerRPC(targetPosition, blockList[selectedBlockIndex].blockId, false, true);
+                    }
                 }
             }
         }
     }
 
-    void PlaceBlock(Vector3 position, byte blockId)
+    public void PlaceBufferedBlocks()
     {
-        ChunkManager.Instance.SetVoxelAtWorldPosition(position, blockId, true, true);
+        foreach ((Vector3, byte) BlockEvent in BufferedBlockEvents)
+        {
+            PlaceBlockServerRPC(BlockEvent.Item1, BlockEvent.Item2, false, false);
+        }
+        ChunkManager.Instance.ClearChunks();
+        BufferedBlockEvents.Clear();
     }
-}
 
-public class Block // Example block class
-{
-    public string name;
-    public byte blockId;
-
-    public Block(string name, byte blockId)
+    [ServerRpc]
+    void PlaceBlockServerRPC(Vector3 position, byte blockId, bool buffer, bool regenerate)
     {
-        this.name = name;
-        this.blockId = blockId;
+        PlaceBlockClientRPC(position, blockId, buffer, regenerate);
+    }
+    [ClientRpc]
+    void PlaceBlockClientRPC(Vector3 position, byte blockId, bool buffer, bool regenerate)
+    {
+        ChunkManager.Instance.SetVoxelAtWorldPosition(position, blockId, regenerate, true);
+        if (buffer && IsHost)
+        {
+            BufferedBlockEvents.Add((position, blockId));
+        }
+    }
+
+    public class Block
+    {
+        public string name;
+        public byte blockId;
+
+        public Block(string name, byte blockId)
+        {
+            this.name = name;
+            this.blockId = blockId;
+        }
     }
 }

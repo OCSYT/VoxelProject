@@ -4,10 +4,17 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.SceneManagement;
-
+using Netcode.Transports.Facepunch;
+using Unity.Netcode;
+using Steamworks;
+using Unity.Collections;
 [RequireComponent(typeof(CharacterController))]
-public class Player : MonoBehaviour
+public class Player : NetworkBehaviour
 {
+    public int PlayerModelLayer;
+    public GameObject PlayerModel;
+    public ChunkManager chunkManager;
+    public BlockPlace BlockPlace;
     public Animator Anim;
     public Transform Head;
     private CharacterController controller;
@@ -32,7 +39,6 @@ public class Player : MonoBehaviour
     public float HandAmountY;
     private float MovementDotY;
     private Vector3 ChunkPosition;
-    private ChunkManager chunkManager;
     private bool PlayerInChunk;
     public bool AllowMovement;
     private bool AllowMovementInit;
@@ -47,30 +53,155 @@ public class Player : MonoBehaviour
     public Toggle graphicsToggle;
 
     public bool isPaused = false;
+    private Player localPlayer;
+
+    public NetworkVariable<float> GameTime = 
+        new NetworkVariable<float>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
+    public NetworkVariable<FixedString32Bytes> Username =
+        new NetworkVariable<FixedString32Bytes>(new FixedString32Bytes(), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
+
+    public NetworkVariable<bool> Synced = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    public NetworkVariable<bool> Hosting = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
+    public NetworkList<byte> NetworkSaveDataBytes = new NetworkList<byte>(null, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
 
     private void Start()
     {
         controller = gameObject.GetComponent<CharacterController>();
         controller.enabled = false;
-        Cursor.lockState = CursorLockMode.Locked;
-        chunkManager = ChunkManager.Instance;
-        StartCoroutine(WaitForInit());
-        RenderDistanceSlider.value = PlayerPrefs.GetInt("RenderDistance", 8);
-        SensitivitySlider.value = PlayerPrefs.GetFloat("Sensitivity", 100);
 
-        // Set the default graphics settings to high
-        graphicsToggle.isOn = PlayerPrefs.GetInt("Graphics", 1) == 1;
-        SetGraphicsSettings(graphicsToggle.isOn);
+        if (IsOwner)
+        {
+            Hosting.Value = IsHost;
+            Username.Value = (FixedString32Bytes)SteamClient.Name;
+            LoadingScreen.SetActive(true);
+            if (IsHost)
+            {
+                StartCoroutine(InitSync(new List<(Vector3, byte)>()));
+            }
+        }
+        else
+        {
+            chunkManager.gameObject.SetActive(false);
+            playerCamera.gameObject.SetActive(false);
+            PlayerModel.layer = PlayerModelLayer;
+        }
+        gameObject.name = Username.Value.ToString();
 
-        // Add listener to the toggle
-        graphicsToggle.onValueChanged.AddListener(delegate {
+
+        if (NetworkManager.IsHost)
+        {
+            GetHost().SyncRequestServerRPC();
+        }
+    }
+    private void OnDestroy()
+    {
+        if (NetworkManager.IsHost)
+        {
+            GetHost().BlockPlace.BufferedBlockEvents.Clear();
+            GetHost().chunkManager.SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
+        }
+    }
+    public Player GetHost()
+    {
+        foreach (Player p in GameObject.FindObjectsOfType<Player>())
+        {
+            if (p.Hosting.Value)
+            {
+                return p;
+            }
+        }
+        return null;
+    }
+    public Player GetLocal()
+    {
+        foreach (Player p in GameObject.FindObjectsOfType<Player>())
+        {
+            if (p.OwnerClientId == NetworkManager.LocalClientId)
+            {
+                return p;
+            }
+        }
+        return null;
+    }
+
+
+    [ServerRpc(RequireOwnership =false)]
+    public void SyncRequestServerRPC()
+    {
+        List<(Vector3, byte)> BlockEvents = BlockPlace.BufferedBlockEvents;
+        Vector3[] VecList = new Vector3[BlockEvents.Count];
+        byte[] ByteList = new byte[BlockEvents.Count];
+        for (int i = 0; i < VecList.Length; i++)
+        {
+            VecList[i] = BlockEvents[i].Item1;
+            ByteList[i] = BlockEvents[i].Item2;
+        }
+
+        Debug.Log("Server: " + BlockEvents.Count);
+
+        SyncRequestClientRPC(VecList, ByteList);
+    }
+    [ClientRpc]
+    public void SyncRequestClientRPC(Vector3[] VecList, byte[] ByteList)
+    {
+        Debug.Log("recieved");
+        List<(Vector3, byte)> BlockEvents = new List<(Vector3, byte)>();
+        for (int i = 0; i < VecList.Length; i++)
+        {
+            BlockEvents.Add((VecList[i], ByteList[i]));
+        }
+        StartCoroutine(WaitForPlayer(BlockEvents));
+    }
+    IEnumerator WaitForPlayer(List<(Vector3, byte)> BlockEvents)
+    {
+        yield return new WaitUntil(() => localPlayer != null);
+
+
+        if (localPlayer.Synced.Value == false)
+        {
+            StartCoroutine(localPlayer.InitSync(BlockEvents));
+        }
+    }
+
+
+    IEnumerator InitSync(List<(Vector3, byte)> BlockEvents)
+    {
+        if (!Synced.Value)
+        {
+
+            yield return new WaitUntil(() => ChunkManager.Instance != null);
+            BlockPlace.BufferedBlockEvents = BlockEvents;
+            Debug.Log("Client: " + BlockEvents.Count);
+            BlockPlace.PlaceBufferedBlocks();
+            Cursor.lockState = CursorLockMode.Locked;
+            chunkManager.StartGenerating();
+            StartCoroutine(WaitForInit());
+            RenderDistanceSlider.value = PlayerPrefs.GetInt("RenderDistance", 8);
+            SensitivitySlider.value = PlayerPrefs.GetFloat("Sensitivity", 100);
+
+            // Set the default graphics settings to high
+            graphicsToggle.isOn = PlayerPrefs.GetInt("Graphics", 1) == 1;
             SetGraphicsSettings(graphicsToggle.isOn);
-        });
+
+            // Add listener to the toggle
+            graphicsToggle.onValueChanged.AddListener(delegate
+            {
+                SetGraphicsSettings(graphicsToggle.isOn);
+            });
+
+        }
+        if(Synced.Value == false)
+        {
+            Synced.Value = true;
+        }
     }
 
     IEnumerator WaitForInit()
     {
-        LoadingScreen.SetActive(true);
         AllowMovementInit = false;
         yield return new WaitUntil(() => chunkManager.SpawnPosition != Vector3.zero);
         yield return new WaitForSeconds(3);
@@ -80,6 +211,13 @@ public class Player : MonoBehaviour
 
     void Update()
     {
+        if(localPlayer == null)
+        {
+            localPlayer = GetLocal();
+        }
+        gameObject.name = Username.Value.ToString();
+        if (IsOwner == false) return;
+        if(chunkManager == null) return;
         PlayerPrefs.SetInt("RenderDistance", (int)RenderDistanceSlider.value);
         PlayerPrefs.SetFloat("Sensitivity", SensitivitySlider.value);
         RenderDistanceText.text = "Render Distance: " + RenderDistanceSlider.value;
@@ -156,6 +294,7 @@ public class Player : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (IsOwner == false) return;
         float playerVelocityAmount = new Vector3(playerVelocity.x, 0, playerVelocity.z).magnitude;
         float MoveAmount = Mathf.Clamp01(Mathf.Abs(Mathf.RoundToInt(playerVelocityAmount)));
 
@@ -225,8 +364,11 @@ public class Player : MonoBehaviour
 
     public void QuitGame()
     {
-        chunkManager.SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
-        SceneManager.LoadScene(0);
+        if (IsHost)
+        {
+            chunkManager.SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
+        }
+        NetworkManager.Singleton.Shutdown();
     }
 
     void SetGraphicsSettings(bool highGraphics)

@@ -724,6 +724,8 @@ public class ChunkManager : NetworkBehaviour
 
                     int perlinRounded = (Mathf.RoundToInt(perlinValue));
 
+                    int worldFloor = -100;
+
 
                     if (voxelPosition.y > perlinRounded && voxelPosition.y <= waterLevel)
                     {
@@ -733,13 +735,13 @@ public class ChunkManager : NetworkBehaviour
                     {
                         if (voxelPosition.y == perlinRounded)
                         {
-                            if(voxelPosition.y == waterLevel)
+                            if (voxelPosition.y == waterLevel)
                             {
                                 voxelValue = BlockList["Sand"];
                             }
                             else
                             {
-                                if(voxelPosition.y < waterLevel)
+                                if (voxelPosition.y < waterLevel)
                                 {
                                     voxelValue = BlockList["Sand"];
                                 }
@@ -761,11 +763,17 @@ public class ChunkManager : NetworkBehaviour
                             }
                         }
                     }
+                    if (voxelPosition.y < worldFloor)
+                    {
+                        voxelValue = BlockList["Bedrock"];
+                    }
 
                     VoxelData[x, y, z] = voxelValue;
                 }
             }
         }
+
+
 
         for (int x = 0; x < ChunkSize; x++)
         {

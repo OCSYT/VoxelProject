@@ -81,7 +81,7 @@ public class BlockPlace : NetworkBehaviour
     void Update()
     {
         if (IsOwner == false) return;
-        if (player.isPaused || !player.AllowMovement) return;
+        if (player.IsPaused || player.Chatting || !player.AllowMovement) return;
         float scroll = Input.GetAxis("Mouse ScrollWheel");
 
         if (scroll > 0f)
@@ -141,13 +141,15 @@ public class BlockPlace : NetworkBehaviour
             {
 
                 Vector3 targetPosition = hit.point - hit.normal / 2f;
+
+                ChunkManager.Instance.SetVoxelAtWorldPosition(targetPosition, 0, true, true);
                 if (IsHost)
                 {
-                    PlaceBlockServerRPC(targetPosition, 0, true, true);
+                    PlaceBlockServerRPC(targetPosition, 0, true, true, NetworkManager.LocalClientId);
                 }
                 else
                 {
-                    PlaceBlockServerRPC(targetPosition, 0, false, true);
+                    PlaceBlockServerRPC(targetPosition, 0, false, true, NetworkManager.LocalClientId);
                 }
             }
         }
@@ -160,41 +162,67 @@ public class BlockPlace : NetworkBehaviour
             {
 
                 Vector3 targetPosition = hit.point + hit.normal / 2f;
-                RaycastHit PlayerRay;
-                if (!Physics.SphereCast(hit.point - hit.normal, 1f, hit.normal, out PlayerRay, 1f, playerLayer))
+                if (PlayerInWay(targetPosition)) return;
+
+                ChunkManager.Instance.SetVoxelAtWorldPosition(targetPosition, blockList[selectedBlockIndex].blockId, true, true);
+                if (IsHost)
                 {
-                    if (IsHost)
-                    {
-                        PlaceBlockServerRPC(targetPosition, blockList[selectedBlockIndex].blockId, true, true);
-                    }
-                    else
-                    {
-                        PlaceBlockServerRPC(targetPosition, blockList[selectedBlockIndex].blockId, false, true);
-                    }
+                    PlaceBlockServerRPC(targetPosition, blockList[selectedBlockIndex].blockId, true, true, NetworkManager.LocalClientId);
+                }
+                else
+                {
+                    PlaceBlockServerRPC(targetPosition, blockList[selectedBlockIndex].blockId, false, true, NetworkManager.LocalClientId);
                 }
             }
         }
     }
 
+    bool PlayerInWay(Vector3 point)
+    {
+        Vector3 TargetPoint = new Vector3(
+            Mathf.Floor(point.x) + 0.5f,
+            Mathf.Floor(point.y) + 0.5f,
+            Mathf.Floor(point.z) + 0.5f
+        );
+
+        Vector3 halfExtents = new Vector3(.9f, .9f, .9f);
+
+        Collider[] Collisions = Physics.OverlapBox(TargetPoint, halfExtents);
+
+        foreach(Collider _collision in Collisions)
+        {
+            if(_collision.gameObject.GetComponent<Player>() != null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
     public void PlaceBufferedBlocks()
     {
         foreach ((Vector3, byte) BlockEvent in BufferedBlockEvents)
         {
-            PlaceBlockServerRPC(BlockEvent.Item1, BlockEvent.Item2, false, false);
+            PlaceBlockServerRPC(BlockEvent.Item1, BlockEvent.Item2, false, false, NetworkManager.LocalClientId);
         }
         ChunkManager.Instance.ClearChunks();
         BufferedBlockEvents.Clear();
     }
 
     [ServerRpc]
-    void PlaceBlockServerRPC(Vector3 position, byte blockId, bool buffer, bool regenerate)
+    void PlaceBlockServerRPC(Vector3 position, byte blockId, bool buffer, bool regenerate, ulong id)
     {
-        PlaceBlockClientRPC(position, blockId, buffer, regenerate);
+        PlaceBlockClientRPC(position, blockId, buffer, regenerate, id);
     }
     [ClientRpc]
-    void PlaceBlockClientRPC(Vector3 position, byte blockId, bool buffer, bool regenerate)
+    void PlaceBlockClientRPC(Vector3 position, byte blockId, bool buffer, bool regenerate, ulong id)
     {
-        ChunkManager.Instance.SetVoxelAtWorldPosition(position, blockId, regenerate, true);
+        if (NetworkManager.LocalClientId != id)
+        {
+            ChunkManager.Instance.SetVoxelAtWorldPosition(position, blockId, regenerate, true);
+        }
         if (buffer && IsHost)
         {
             BufferedBlockEvents.Add((position, blockId));

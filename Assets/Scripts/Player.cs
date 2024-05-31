@@ -11,6 +11,11 @@ using Unity.Collections;
 [RequireComponent(typeof(CharacterController))]
 public class Player : NetworkBehaviour
 {
+    public GameObject ChatPrefab;
+    public Transform ChatContent;
+    public TMP_InputField ChatInput;
+    public GameObject ChatCanvas;
+    public Transform UsernameRoot;
     public int PlayerModelLayer;
     public GameObject PlayerModel;
     public ChunkManager chunkManager;
@@ -52,19 +57,23 @@ public class Player : NetworkBehaviour
     public TextMeshProUGUI SensitivityText;
     public Toggle graphicsToggle;
 
-    public bool isPaused = false;
+    public bool IsPaused = false;
+    public bool Chatting = false;
     private Player localPlayer;
 
+    [HideInInspector]
     public NetworkVariable<float> GameTime = 
         new NetworkVariable<float>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-
+    [HideInInspector]
     public NetworkVariable<FixedString32Bytes> Username =
         new NetworkVariable<FixedString32Bytes>(new FixedString32Bytes(), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-
-
+    [HideInInspector]
     public NetworkVariable<bool> Synced = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    [HideInInspector]
     public NetworkVariable<bool> Hosting = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-
+    [HideInInspector]
+    public NetworkVariable<bool> Moving = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    [HideInInspector]
     public NetworkList<byte> NetworkSaveDataBytes = new NetworkList<byte>(null, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
 
@@ -82,6 +91,7 @@ public class Player : NetworkBehaviour
             {
                 StartCoroutine(InitSync(new List<(Vector3, byte)>()));
             }
+            UsernameRoot.gameObject.SetActive(false);
         }
         else
         {
@@ -209,6 +219,33 @@ public class Player : NetworkBehaviour
         LoadingScreen.SetActive(false);
     }
 
+    [ServerRpc]
+    void SendChatMessageServerRPC(string message)
+    {
+        SendChatMessageClientRPC(message);
+    }
+    [ClientRpc]
+    void SendChatMessageClientRPC(string message)
+    {
+        foreach (Player p in GameObject.FindObjectsOfType<Player>())
+        {
+            Transform chatContentTransform = p.ChatContent;
+            // Limit to 5 children
+            if (chatContentTransform.childCount >= 5)
+            {
+                Destroy(chatContentTransform.GetChild(0).gameObject);
+            }
+
+            // Instantiate the new chat message
+            TextMeshProUGUI Text = Instantiate(ChatPrefab, chatContentTransform).GetComponent<TextMeshProUGUI>();
+            Text.text = message;
+
+            // Start coroutine to delete the message after 60 seconds
+            Destroy(Text.gameObject, 60);
+        }
+    }
+
+
     void Update()
     {
         if(localPlayer == null)
@@ -216,10 +253,26 @@ public class Player : NetworkBehaviour
             localPlayer = GetLocal();
         }
         gameObject.name = Username.Value.ToString();
+        UsernameRoot.GetChild(0).GetComponent<TextMeshPro>().text = Username.Value.ToString();
+        if(Camera.main != null)
+        {
+            UsernameRoot.LookAt(Camera.main.transform.position);
+        }
+
+
         if (IsOwner == false) return;
         if(chunkManager == null) return;
-        PlayerPrefs.SetInt("RenderDistance", (int)RenderDistanceSlider.value);
-        PlayerPrefs.SetFloat("Sensitivity", SensitivitySlider.value);
+        Cursor.visible = Cursor.lockState != CursorLockMode.Locked;
+
+
+        if (RenderDistanceSlider.value != 8)
+        {
+            PlayerPrefs.SetInt("RenderDistance", (int)RenderDistanceSlider.value);
+        }
+        if (SensitivitySlider.value != 100)
+        {
+            PlayerPrefs.SetFloat("Sensitivity", SensitivitySlider.value);
+        }
         RenderDistanceText.text = "Render Distance: " + RenderDistanceSlider.value;
         SensitivityText.text = "Sensitivity: " + SensitivitySlider.value / 100;
 
@@ -234,9 +287,57 @@ public class Player : NetworkBehaviour
         if (AllowMovement == false || AllowMovementInit == false) return;
         controller.enabled = true;
 
-        if (Input.GetKeyDown(KeyCode.Escape))
+
+
+        if (Input.GetKeyDown(KeyCode.T) && !IsPaused)
         {
-            if (isPaused)
+            Cursor.lockState = CursorLockMode.None;
+            ChatCanvas.gameObject.SetActive(true);
+            ChatInput.Select();
+            Chatting = true;
+        }
+        if(Chatting && !IsPaused)
+        {
+            if (Input.GetKeyDown(KeyCode.Return))
+            {
+                UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
+                Cursor.lockState = CursorLockMode.Locked;
+                ChatCanvas.gameObject.SetActive(false);
+                Chatting = false;
+
+                if(ChatInput.text == "/spawn")
+                {
+                    controller.enabled = false;
+                    transform.position = chunkManager.SpawnPosition;
+                    controller.enabled = true;
+                }
+
+                else if (ChatInput.text != "")
+                {
+                    if (IsHost)
+                    {
+                        SendChatMessageServerRPC("<color=yellow>" + Username.Value.ToString() + "</color>: " + ChatInput.text);
+                    }
+                    else
+                    {
+                        SendChatMessageServerRPC(Username.Value.ToString() +": "+ ChatInput.text);
+                    }
+                }
+                ChatInput.text = "";
+            }
+        }
+
+        if(transform.position.y < -100)
+        {
+            controller.enabled = false;
+            transform.position = chunkManager.SpawnPosition;
+            controller.enabled = true;
+        }
+
+
+        if (Input.GetKeyDown(KeyCode.Escape) && !Chatting)
+        {
+            if (IsPaused)
             {
                 Resume();
             }
@@ -246,7 +347,7 @@ public class Player : NetworkBehaviour
             }
         }
 
-        if (Input.GetKeyDown(KeyCode.F5) && !isPaused)
+        if (Input.GetKeyDown(KeyCode.F5) && !IsPaused && !Chatting)
         {
             if (camVal != 2)
             {
@@ -294,18 +395,19 @@ public class Player : NetworkBehaviour
 
     private void LateUpdate()
     {
+        Anim.SetBool("Moving", Moving.Value);
         if (IsOwner == false) return;
         float playerVelocityAmount = new Vector3(playerVelocity.x, 0, playerVelocity.z).magnitude;
         float MoveAmount = Mathf.Clamp01(Mathf.Abs(Mathf.RoundToInt(playerVelocityAmount)));
 
         if (MoveAmount == 1)
         {
-            Anim.SetBool("Moving", true);
+            Moving.Value = true; 
             MovementDotY = (Vector3.Dot((transform.right), (playerVelocity))) * 5;
         }
         else
         {
-            Anim.SetBool("Moving", false);
+            Moving.Value = false;
         }
 
         Hand.transform.localPosition = new Vector3(Mathf.Sin(Time.time * playerSpeed * HandAmountX * MoveAmount) * HandAmount, Mathf.Sin(Time.time * playerSpeed * HandAmountY * MoveAmount) * HandAmount, 0);
@@ -315,8 +417,8 @@ public class Player : NetworkBehaviour
 
     void MouseLook()
     {
-        float mouseX = isPaused ? 0 : Input.GetAxisRaw("Mouse X") * mouseSensitivity * averageDeltaTime;
-        float mouseY = isPaused ? 0 : Input.GetAxisRaw("Mouse Y") * mouseSensitivity * averageDeltaTime;
+        float mouseX = !(!IsPaused && !Chatting) ? 0 : Input.GetAxisRaw("Mouse X") * mouseSensitivity * averageDeltaTime;
+        float mouseY = !(!IsPaused && !Chatting) ? 0 : Input.GetAxisRaw("Mouse Y") * mouseSensitivity * averageDeltaTime;
 
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, -90f, 90f);
@@ -335,11 +437,11 @@ public class Player : NetworkBehaviour
             playerVelocity.y = 0f;
         }
 
-        Vector3 move = isPaused ? Vector3.zero : transform.right * Input.GetAxisRaw("Horizontal") + transform.forward * Input.GetAxisRaw("Vertical");
+        Vector3 move = !(!IsPaused && !Chatting) ? Vector3.zero : transform.right * Input.GetAxisRaw("Horizontal") + transform.forward * Input.GetAxisRaw("Vertical");
         playerVelocity.x = move.x * playerSpeed;
         playerVelocity.z = move.z * playerSpeed;
 
-        if (Input.GetButtonDown("Jump") && groundedPlayer)
+        if (Input.GetButtonDown("Jump") && groundedPlayer && !IsPaused && !Chatting)
         {
             playerVelocity.y += Mathf.Sqrt(jumpHeight * -3.0f * gravityValue);
         }
@@ -351,14 +453,14 @@ public class Player : NetworkBehaviour
     public void Resume()
     {
         pauseMenuUI.SetActive(false);
-        isPaused = false;
+        IsPaused = false;
         Cursor.lockState = CursorLockMode.Locked;
     }
 
     void Pause()
     {
         pauseMenuUI.SetActive(true);
-        isPaused = true;
+        IsPaused = true;
         Cursor.lockState = CursorLockMode.None;
     }
 

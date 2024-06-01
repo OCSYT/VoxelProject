@@ -185,7 +185,7 @@ public class BlockPlace : NetworkBehaviour
             Mathf.Floor(point.z) + 0.5f
         );
 
-        Vector3 halfExtents = new Vector3(.9f, .9f, .9f);
+        Vector3 halfExtents = new Vector3(.5f, .5f, .5f);
 
         Collider[] Collisions = Physics.OverlapBox(TargetPoint, halfExtents);
 

@@ -9,6 +9,7 @@ using Unity.Netcode;
 using Steamworks;
 using Unity.Collections;
 using System.IO;
+using System;
 [RequireComponent(typeof(CharacterController))]
 public class Player : NetworkBehaviour
 {
@@ -47,11 +48,12 @@ public class Player : NetworkBehaviour
     private Vector3 ChunkPosition;
     private bool PlayerInChunk;
     public bool AllowMovement;
-    private bool AllowMovementInit;
+    private bool AllowMovementUpdate;
 
     public GameObject pauseMenuUI;
     public GameObject LoadingScreen;
     public GameObject HandUI;
+    public TextMeshProUGUI CodeText;
     public Slider RenderDistanceSlider;
     public Slider SensitivitySlider;
     public TextMeshProUGUI RenderDistanceText;
@@ -75,12 +77,43 @@ public class Player : NetworkBehaviour
     [HideInInspector]
     public NetworkVariable<bool> Moving = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     private string TargetWorldName;
-
-    public void Teleport(Vector3 Position)
+    private bool Teleporting = false;
+    public void Teleport(Vector3 Position, float EulerAngle, bool MakeNotInGround)
     {
+        Teleporting = true;
+        Position = Vector3Int.FloorToInt(Position) + new Vector3(0.5f, 0.5f, 0.5f);
         controller.enabled = false;
         transform.position = Position;
+        transform.eulerAngles = new Vector3(0, EulerAngle, 0);
+        xRotation = 0;
+        StartCoroutine(WaitForChunkTeleport(Position, MakeNotInGround));
     }
+
+    IEnumerator WaitForChunkTeleport(Vector3 Position, bool MakeNotInGround)
+    {
+        if (MakeNotInGround)
+        {
+            Chunk currentChunk = chunkManager.GetChunk(transform.position);
+            bool inChunk = currentChunk != null;
+            AllowMovementUpdate = false;
+            if (!inChunk)
+            {
+                yield return new WaitForSeconds(3);
+            }
+            float yPos = 0;
+            RaycastHit hit;
+            if (Physics.Raycast(Position + Vector3.up * 100, Vector3.down, out hit, Mathf.Infinity, ~ignore))
+            {
+                yPos = hit.point.y + 1;
+                transform.position = new Vector3(Position.x, yPos, Position.z);
+            }
+            AllowMovementUpdate = true;
+        }
+
+        Teleporting = false;
+    }
+
+
     private void Awake()
     {
         controller = gameObject.GetComponent<CharacterController>();
@@ -109,6 +142,7 @@ public class Player : NetworkBehaviour
             {
                 SetGraphicsSettings(graphicsToggle.isOn);
             });
+            CodeText.text = NetworkMenu.instance.CodeToJoin.ToString();
         }
         else
         {
@@ -129,6 +163,13 @@ public class Player : NetworkBehaviour
             host.SyncRequestServerRPC();
         }
     }
+
+    public void CopyCode()
+    {
+        GUIUtility.systemCopyBuffer = NetworkMenu.instance.CodeToJoin.ToString();
+    }
+
+
     private void OnDestroy()
     {
         if (NetworkManager.IsHost)
@@ -234,12 +275,12 @@ public class Player : NetworkBehaviour
         }
     }
 
+    public bool Spawned = false;
     IEnumerator WaitForInit()
     {
-        AllowMovementInit = false;
         yield return new WaitUntil(() => chunkManager.SpawnPosition != Vector3.zero);
         yield return new WaitForSeconds(3);
-        AllowMovementInit = true;
+        Spawned = true;
         LoadingScreen.SetActive(false);
         SendChatMessageServerRPC("<color=yellow>" + Username.Value.ToString() + " has joined");
     }
@@ -292,9 +333,16 @@ public class Player : NetworkBehaviour
 
     IEnumerator WaitForChunk()
     {
-        AllowMovementInit = false;
+        AllowMovementUpdate = false;
         yield return new WaitForSeconds(3);
-        AllowMovementInit = true;
+        AllowMovementUpdate = true;
+    }
+
+    [ServerRpc]
+    public void SetTimeServerRPC(float Time)
+    {
+        Debug.Log(Time);
+        GetHost().GameTime.Value = Time;
     }
 
     Coroutine WaitForChunkCoroutine;
@@ -331,10 +379,10 @@ public class Player : NetworkBehaviour
 
         Chunk currentChunk = chunkManager.GetChunk(transform.position);
         PlayerInChunk = currentChunk != null;
-        AllowMovement = PlayerInChunk && AllowMovementInit;
+        AllowMovement = PlayerInChunk && Spawned && AllowMovementUpdate;
 
         controller.enabled = false;
-        if (PlayerInChunk == false)
+        if (PlayerInChunk == false && !Teleporting && Spawned)
         {
             if(WaitForChunkCoroutine != null)
             {
@@ -342,11 +390,16 @@ public class Player : NetworkBehaviour
             }
             WaitForChunkCoroutine = StartCoroutine(WaitForChunk());
         }
-        if (AllowMovement == false) return;
-        if (controller.enabled == false)
+
+        if (Spawned == false) return;
+        if (AllowMovement)
         {
-            controller.enabled = true;
+            if (controller.enabled == false)
+            {
+                controller.enabled = true;
+            }
         }
+
 
 
         if (Input.GetKeyDown(KeyCode.T) && !IsPaused)
@@ -367,27 +420,55 @@ public class Player : NetworkBehaviour
 
                 if (ChatInput.text == "/help")
                 {
-                    SendChatMessageLocal("<color=green>/spawn, tp {Username}</color>");
+                    SendChatMessageLocal("<color=#00FFFF>/spawn, /tp {Username} | {x} {y} {z}, /setSpawnPosition, /time set {Value}</color>");
                 }
                 else if(ChatInput.text == "/spawn")
                 {
-                    Teleport(chunkManager.SpawnPosition);
-                    SendChatMessageLocal("<color=green>Teleported!</color>");
+                    Teleport(chunkManager.SpawnPosition, 0, true);
+                    SendChatMessageLocal("<color=#00FFFF>Teleported</color>");
                 }
                 else if (ChatInput.text.StartsWith("/tp "))
                 {
                     string[] parts = ChatInput.text.Split(' ');
                     if (parts.Length >= 2)
                     {
-                        string username = parts[1];
-                        Player p = GetPlayerByName(username);
-                        if(p != null && username != this.Username.Value) {
-                            Teleport(p.transform.position);
-                            SendChatMessageLocal("<color=green>Teleported!</color>");
+                        string usernameOrX = parts[1];
+                        Player p = GetPlayerByName(usernameOrX);
+
+                        // Check if input is a username
+                        if (p != null && usernameOrX != this.Username.Value)
+                        {
+                            Teleport(p.transform.position, 0, false);
+                            SendChatMessageLocal("<color=#00FFFF>Teleported to player " + usernameOrX + "</color>");
+                        }
+                        else if (parts.Length == 4)
+                        {
+                            Vector3 currentPosition = this.transform.position; // Assuming this is the player's current position
+                            float x = 0;
+                            float y = 0;
+                            float z = 0;
+                            bool validX = parts[1] == "~" || float.TryParse(parts[1], out x);
+                            bool validY = parts[2] == "~" || float.TryParse(parts[2], out y);
+                            bool validZ = parts[3] == "~" || float.TryParse(parts[3], out z);
+
+                            if (validX && validY && validZ)
+                            {
+                                x = parts[1] == "~" ? currentPosition.x : x;
+                                y = parts[2] == "~" ? currentPosition.y : y;
+                                z = parts[3] == "~" ? currentPosition.z : z;
+
+                                Vector3 targetPosition = new Vector3(x, y, z);
+                                Teleport(targetPosition, 0, false);
+                                SendChatMessageLocal("<color=#00FFFF>Teleported to coordinates (" + x + ", " + y + ", " + z + ")</color>");
+                            }
+                            else
+                            {
+                                SendChatMessageLocal("<color=red>Invalid coordinates</color>");
+                            }
                         }
                         else
                         {
-                            SendChatMessageLocal("<color=red>Invalid user " + username + "</color>");
+                            SendChatMessageLocal("<color=red>Invalid user or coordinates</color>");
                         }
                     }
                     else
@@ -395,6 +476,36 @@ public class Player : NetworkBehaviour
                         SendChatMessageLocal("<color=red>Invalid Syntax</color>");
                     }
                 }
+                else if (ChatInput.text == "/setSpawnPosition")
+                {
+                    if (IsHost)
+                    {
+                        chunkManager.SpawnPosition = transform.position;
+                        chunkManager.SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
+                        SendChatMessageLocal("<color=#00FFFF>Set Spawn position to (" + transform.position.x + ", " + transform.position.y + ", " + transform.position.z + ")</color>");
+                    }
+                    else
+                    {
+                        SendChatMessageLocal("<color=red>You need to be the host</color>");
+                    }
+                }
+                else if (ChatInput.text.StartsWith("/time set "))
+                {
+                    string timeString = ChatInput.text.Substring(10);
+
+                    if (float.TryParse(timeString, out float timeValue))
+                    {
+                        SetTimeServerRPC(timeValue);
+                        SendChatMessageLocal("<color=#00FFFF>Time set to " + timeValue + "</color>");
+                    }
+                    else
+                    {
+                        SendChatMessageLocal("<color=red>Invalid time value entered</color>");
+                    }
+                }
+
+
+
                 else if (ChatInput.text.StartsWith("/"))
                 {
                     SendChatMessageLocal("<color=red>Invalid Syntax</color>");
@@ -418,7 +529,7 @@ public class Player : NetworkBehaviour
 
         if(transform.position.y < -100)
         {
-            Teleport(chunkManager.SpawnPosition);
+            Teleport(chunkManager.SpawnPosition, 0, true);
         }
 
 
@@ -564,7 +675,7 @@ public class Player : NetworkBehaviour
     void SetGraphicsSettings(bool highGraphics)
     {
         PlayerPrefs.SetInt("Graphics", highGraphics ? 1 : 0);
-        Light mainLight = GameObject.FindObjectOfType<Light>();
+        Light mainLight = chunkManager.DirectionalLight;
         if (mainLight != null)
         {
             if (highGraphics)

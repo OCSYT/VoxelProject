@@ -517,17 +517,9 @@ public class Chunk : MonoBehaviour
             LightParent.transform.parent = transform;
         }
 
-        if (LightParent)
-        {
-            foreach (Transform child in LightParent.transform)
-            {
-                Destroy(child.gameObject);
-            }
-        }
-
         List<(Vector3, Color)> LightPositions = new List<(Vector3, Color)>();
         Vector3 chunkCornerWorldPos = transform.position;
-        await Task.Run(async () =>
+        await Task.Run(() =>
         {
             for (int x = 0; x < ChunkSize; x++)
             {
@@ -552,23 +544,45 @@ public class Chunk : MonoBehaviour
                     }
                 }
             }
-            await Task.CompletedTask;
         });
 
         if (isDestroyed)
         {
             return;
         }
+
+        // Collect existing light positions
+        HashSet<Vector3> existingLightPositions = new HashSet<Vector3>();
+        foreach (Transform child in LightParent.transform)
+        {
+            existingLightPositions.Add(child.position);
+        }
+
+        // Create new lights if they do not already exist
+        HashSet<Vector3> newLightPositions = new HashSet<Vector3>();
         foreach ((Vector3, Color) LightPos in LightPositions)
         {
-            GameObject LightObj = new GameObject(LightPos.Item1.ToString());
-            LightObj.transform.position = LightPos.Item1;
-            LightObj.transform.parent = LightParent.transform;
-            Light LightComponent = LightObj.AddComponent<Light>();
-            LightComponent.type = LightType.Point;
-            LightComponent.color = LightPos.Item2;
-            LightComponent.intensity = 1 / Mathf.Clamp(((LightPos.Item2.r + LightPos.Item2.g + LightPos.Item2.b)/3), 1, Mathf.Infinity);
-            LightComponent.range = 50;
+            if (!existingLightPositions.Contains(LightPos.Item1))
+            {
+                GameObject LightObj = new GameObject(LightPos.Item1.ToString());
+                LightObj.transform.position = LightPos.Item1;
+                LightObj.transform.parent = LightParent.transform;
+                Light LightComponent = LightObj.AddComponent<Light>();
+                LightComponent.type = LightType.Point;
+                LightComponent.color = LightPos.Item2;
+                LightComponent.intensity = 1 / Mathf.Clamp(((LightPos.Item2.r + LightPos.Item2.g + LightPos.Item2.b) / 3), 1, Mathf.Infinity);
+                LightComponent.range = 50;
+            }
+            newLightPositions.Add(LightPos.Item1);
+        }
+
+        // Destroy lights that are not in the current LightPositions
+        foreach (Transform child in LightParent.transform)
+        {
+            if (!newLightPositions.Contains(child.position))
+            {
+                Destroy(child.gameObject);
+            }
         }
     }
 

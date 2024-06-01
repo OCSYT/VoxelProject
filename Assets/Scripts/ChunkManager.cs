@@ -243,7 +243,10 @@ public class ChunkManager : NetworkBehaviour
 
         if (local)
         {
-            GameTime = saveData.GameTime;
+            if (IsHost)
+            {
+                GetHost().GameTime.Value = saveData.GameTime;
+            }
         }
         else
         {
@@ -259,22 +262,16 @@ public class ChunkManager : NetworkBehaviour
             chunk => ConvertTo3DArray(chunk.Data, ChunkSize, ChunkSize, ChunkSize)
         );
 
-        // Regenerate chunks based on loaded data
-        foreach (var chunk in chunkCache.Keys)
-        {
-            CreateChunk(chunk);
-        }
 
         // Restore player positions
         foreach (Player player in GameObject.FindObjectsOfType<Player>())
         {
-            player.Teleport(saveData.SpawnPosition.ToVector3Int());
+            player.Teleport(saveData.SpawnPosition.ToVector3Int(), 0, true);
             foreach (PlayerData playerData in saveData.Players)
             {
                 if (player.gameObject.name == playerData.Name)
                 {
-                    player.Teleport(playerData.Position.ToVector3());
-                    player.transform.eulerAngles = new Vector3(0, playerData.Y, 0);
+                    player.Teleport(playerData.Position.ToVector3(), playerData.Y, true);
                     break;
                 }
             }
@@ -330,7 +327,7 @@ public class ChunkManager : NetworkBehaviour
     public Dictionary<string, byte> BlockList = new Dictionary<string, byte>();
     public Dictionary<byte, Color> BlockListLight = new Dictionary<byte, Color>();
     public Dictionary<byte, int[]> BlockFaces = new Dictionary<byte, int[]>();
-    private Light DirectionalLight;
+    public Light DirectionalLight;
     public Color AmbientColor;
     public float MinimumAmbient;
     public int IgnoreLayer;
@@ -341,9 +338,6 @@ public class ChunkManager : NetworkBehaviour
     public ShareFile ShareFile;
     private void Awake()
     {
-
-
-        DirectionalLight = GameObject.FindObjectOfType<Light>();
         int index = 0;
         foreach (var block in Blocks)
         {
@@ -381,9 +375,10 @@ public class ChunkManager : NetworkBehaviour
             }
             else
             {
-                SpawnPosition = await GetFirstLandPosition(IsSuperFlat);
+                Vector3 SpawnPos = await GetFirstLandPosition(IsSuperFlat);
                 Player p = GameObject.FindObjectOfType<Player>();
-                p.transform.position = SpawnPosition;
+                p.Teleport(SpawnPos, 0, true);
+                SpawnPosition = SpawnPos;
                 SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
             }
         }
@@ -508,12 +503,17 @@ public class ChunkManager : NetworkBehaviour
             cancelledGeneration = true;
         }
 
-        GameTime += Time.deltaTime;
+       
         if (IsHost)
         {
+            GameTime = GetHost().GameTime.Value + (Time.deltaTime * Daylength);
             GetHost().GameTime.Value = GameTime;
         }
-        float SkyValue = (GameTime * Daylength) % 360;
+        else
+        {
+            GameTime = GetHost().GameTime.Value;
+        }
+        float SkyValue = (GameTime) % 360;
         DirectionalLight.transform.rotation = Quaternion.Euler(SkyValue, 45, 0);
 
         DirectionalLight.intensity = 2 * Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up);
@@ -645,7 +645,7 @@ public class ChunkManager : NetworkBehaviour
         if (superflat)
         {
             int flatHeight = worldFloor + superflatHeight;
-            return new Vector3(0.5f, flatHeight + 2.5f, 0.5f);
+            return new Vector3(0, flatHeight + 2, 0);
         }
 
         Vector3 FinalPos = Vector3.zero;
@@ -666,16 +666,16 @@ public class ChunkManager : NetworkBehaviour
 
                     if (y == perlinRounded && y > waterLevel)
                     {
-                        FinalPos = new Vector3(x, perlinRounded, 0);
+                        FinalPos = new Vector3(x, perlinRounded + 2, 0);
                         return; // Exit the loop once a land position is found
                     }
                 }
 
-                await Task.Delay(10); // Add a delay to prevent freezing the process
+                await Task.Delay(1); // Add a delay to prevent freezing the process
             }
         });
 
-        return FinalPos + new Vector3(0.5f, 2.5f, 0.5f);
+        return FinalPos;
     }
 
 

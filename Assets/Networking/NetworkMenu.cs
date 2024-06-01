@@ -129,7 +129,6 @@ public class NetworkMenu : MonoBehaviour
 
     private void SteamMatchmaking_OnLobbyEntered(Lobby lobby)
     {
-        Debug.Log("Entered lobby");
         if (_NetworkManager.IsHost)
         {
             return;
@@ -141,7 +140,12 @@ public class NetworkMenu : MonoBehaviour
         Transport.targetSteamId = lobby.Owner.Id;
         if (Transport.targetSteamId != 0)
         {
+            Debug.Log("Entered lobby");
             _NetworkManager.StartClient();
+        }
+        else
+        {
+            CodeToJoin = 0;
         }
 
 
@@ -209,6 +213,13 @@ public class NetworkMenu : MonoBehaviour
     public async void Host()
     {   
         currentLobby = await SteamMatchmaking.CreateLobbyAsync(100);
+    }
+
+
+    public async void ClientJoinCode(ulong Code)
+    {
+        CodeToJoin = Code;
+        await SteamMatchmaking.JoinLobbyAsync(CodeToJoin);
     }
 
     public async void Client()

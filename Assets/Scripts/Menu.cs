@@ -12,9 +12,11 @@ public class Menu : MonoBehaviour
 {
     public TMP_InputField Seed;
     public TMP_InputField WorldName;
+    public TMP_InputField CodeField;
     public GameObject SavePrefab;
     public Transform Content;
     public Toggle superflattoggle;
+
     void Start()
     {
 
@@ -137,6 +139,17 @@ public class Menu : MonoBehaviour
         PlayerPrefs.SetString("WorldName", WorldName);
         PlayerPrefs.SetInt("Seed", 0);
         NetworkMenu.instance.Host();
+    }
+
+    public void JoinCode()
+    {
+        ulong result;
+
+        if (ulong.TryParse(CodeField.text, out result))
+        {
+            NetworkMenu.instance.ClientJoinCode(result);
+        }
+
     }
 
     // Update is called once per frame

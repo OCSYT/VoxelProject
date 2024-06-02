@@ -89,6 +89,14 @@ public class Player : NetworkBehaviour
         StartCoroutine(WaitForChunkTeleport(Position, MakeNotInGround));
     }
 
+    public void TeleportPlayerCorrect(Vector3 Position)
+    {
+        Teleporting = true;
+        controller.enabled = false;
+        transform.position = Position;
+        Teleporting = false;
+    }
+
     IEnumerator WaitForChunkTeleport(Vector3 Position, bool MakeNotInGround)
     {
         if (MakeNotInGround)
@@ -331,10 +339,10 @@ public class Player : NetworkBehaviour
         }
     }
 
-    IEnumerator WaitForChunk()
+    public IEnumerator WaitForChunk(float time)
     {
         AllowMovementUpdate = false;
-        yield return new WaitForSeconds(3);
+        yield return new WaitForSeconds(time);
         AllowMovementUpdate = true;
     }
 
@@ -388,7 +396,7 @@ public class Player : NetworkBehaviour
             {
                 StopCoroutine(WaitForChunkCoroutine);
             }
-            WaitForChunkCoroutine = StartCoroutine(WaitForChunk());
+            WaitForChunkCoroutine = StartCoroutine(WaitForChunk(3));
         }
 
         if (Spawned == false) return;

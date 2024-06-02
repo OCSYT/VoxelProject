@@ -1,8 +1,10 @@
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Unity.Netcode;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -191,7 +193,7 @@ public class Chunk : MonoBehaviour
                     Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
 
                     // Check if current voxel is below water level and air
-                    if (voxelPosition.y <= ChunkManager.Instance.waterLevel && voxelPosition.y > ChunkManager.Instance.worldFloor  && VoxelData[x, y, z] == BlockList["Air"])
+                    if (voxelPosition.y <= ChunkManager.Instance.waterLevel && voxelPosition.y > ChunkManager.Instance.worldFloor && VoxelData[x, y, z] == BlockList["Air"])
                     {
                         // Check if any neighboring voxel is water
                         bool hasWaterNeighbor = CheckForWaterNeighbor(x, y, z);
@@ -262,12 +264,75 @@ public class Chunk : MonoBehaviour
 
     private bool isGeneratingMesh = false;
 
+
+    Player[] players = new Player[0];
+    private int prevPlayers;
+    private float timer = 0.1f; // Timer set to 0.1 seconds
+    private float timerReset = 0.1f; // Timer reset value
+    private int prevPlayersCount = 0; // Previous player count
+
+
+    private void FixedUpdate()
+    {
+        timer -= Time.fixedDeltaTime; // Decrement timer
+
+        if (timer <= 0f)
+        {
+            // Reset timer
+            timer = timerReset;
+
+            // Check for player count change
+            int networkCount = NetworkManager.Singleton.ConnectedClientsIds.Count;
+            if (networkCount != prevPlayersCount)
+            {
+                players = GameObject.FindObjectsOfType<Player>();
+                prevPlayersCount = networkCount;
+            }
+            UpdatePlayerPositions();
+        }
+    }
+
+    private void UpdatePlayerPositions()
+    {
+        Vector3Int chunkPosition = Vector3Int.FloorToInt(transform.position);
+        ConcurrentDictionary<string, Vector3> playerPositions = new ConcurrentDictionary<string, Vector3>();
+
+        // Populate player positions dictionary
+        for (int i = 0; i < players.Length; i++)
+        {
+            Player player = players[i];
+            playerPositions[player.gameObject.name] = player.transform.position;
+
+            Vector3 playerPos = player.transform.position;
+            Vector3Int playerAlignedGridPos = Vector3Int.FloorToInt(playerPos);
+            Vector3Int LocalPlayerPosition = Vector3Int.FloorToInt(transform.InverseTransformPoint(playerAlignedGridPos));
+
+            bool InRangeX = LocalPlayerPosition.x >= 0 && LocalPlayerPosition.x < ChunkSize;
+            bool InRangeY = LocalPlayerPosition.y >= 0 && LocalPlayerPosition.y < ChunkSize;
+            bool InRangeZ = LocalPlayerPosition.z >= 0 && LocalPlayerPosition.z < ChunkSize;
+
+
+            if (InRangeX && InRangeY && InRangeZ)
+            {
+                //VoxelData axis only goes up to size of ChunkSize
+                if (VoxelData[LocalPlayerPosition.x, LocalPlayerPosition.y, LocalPlayerPosition.z] != 0)
+                {
+                    playerPositions[player.gameObject.name] = playerPos + Vector3.up * 2;
+                    player.TeleportPlayerCorrect(playerPositions[player.gameObject.name]);
+                    StartCoroutine(player.WaitForChunk(.5f));
+                    Debug.Log("Moving player");
+                }
+            }
+        }
+    }
+
+
     public async void GenerateMesh(bool updateNeighbors)
     {
         if (isGeneratingMesh || isDestroyed) return;
-        CreateLights();
 
         isGeneratingMesh = true;
+        CreateLights();
         BlockChunkUpdate();
 
         List<Vector3> vertices = new List<Vector3>();
@@ -288,8 +353,7 @@ public class Chunk : MonoBehaviour
         List<Vector2> uvsNoCollisionTransparent = new List<Vector2>();
 
 
-
-
+        Vector3 ChunkPosition = transform.position;
 
         await Task.Run(async () =>
         {
@@ -306,7 +370,6 @@ public class Chunk : MonoBehaviour
                         if (VoxelData[x, y, z] == BlockList["Air"])
                             continue;
 
-                        Vector3Int voxelPos = new Vector3Int(x, y, z);
 
                         // Define the six directions as offsets from the current voxel position
                         Vector3Int[] directions = new Vector3Int[]
@@ -444,6 +507,7 @@ public class Chunk : MonoBehaviour
 
 
         if (isDestroyed || !isGeneratingMesh) return;
+
         if (Main)
         {
             UpdateMesh(_Mesh, vertices, triangles, uvs, Main.gameObject);
@@ -467,8 +531,6 @@ public class Chunk : MonoBehaviour
         {
             UpdateNeighborChunks();
         }
-
-
 
         isGeneratingMesh = false;
     }
@@ -609,11 +671,11 @@ public class Chunk : MonoBehaviour
             z + dz >= 0 && z + dz < ChunkSize)
         {
             byte NeighbourBlockID = VoxelData[x + dx, y + dy, z + dz];
-           
+
 
             bool isTransparent = ReturnType(VoxelData[x, y, z], TransparentIDs);
-            bool isNoCollision = ReturnType(VoxelData[x,y, z], NoCollisionIDs);
-            bool isNoCollisionTransparent = ReturnType(VoxelData[x,y,z], NoCollisionTransparentIDs);
+            bool isNoCollision = ReturnType(VoxelData[x, y, z], NoCollisionIDs);
+            bool isNoCollisionTransparent = ReturnType(VoxelData[x, y, z], NoCollisionTransparentIDs);
 
 
             bool NeighborisTransparent = ReturnType(NeighbourBlockID, TransparentIDs);
@@ -632,7 +694,7 @@ public class Chunk : MonoBehaviour
             {
 
                 bool isNeighborTransparentBlockSameType = false;
-                if(NeighbourBlockID == VoxelData[x, y, z])
+                if (NeighbourBlockID == VoxelData[x, y, z])
                 {
                     isNeighborTransparentBlockSameType = true;
                 }
@@ -700,7 +762,7 @@ public class Chunk : MonoBehaviour
             }
         }
 
-        return false; 
+        return false;
     }
 
     private (Chunk[], bool[]) GetNeighboringChunks(bool useDiagonal)

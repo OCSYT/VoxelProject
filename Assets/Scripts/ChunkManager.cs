@@ -186,6 +186,9 @@ public class ChunkManager : NetworkBehaviour
         }
 
         File.WriteAllBytes(filePath, saveDataBytes);
+
+        GetHost().BlockPlace.BufferedBlockEvents.Clear();
+
         Debug.Log("Game saved successfully!");
     }
 
@@ -381,6 +384,7 @@ public class ChunkManager : NetworkBehaviour
                 SpawnPosition = SpawnPos;
                 SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
             }
+            InvokeRepeating("SaveGameUpdate", 60 * 5, 60 * 5);
         }
         else
         {
@@ -389,6 +393,11 @@ public class ChunkManager : NetworkBehaviour
         }
 
         InvokeRepeating("GenerateChunkUpdate", 0, .1f);
+    }
+
+    void SaveGameUpdate()
+    {
+        SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
     }
 
     public void SyncSave(ulong clientID)

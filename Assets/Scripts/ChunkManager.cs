@@ -274,7 +274,7 @@ public class ChunkManager : NetworkBehaviour
             {
                 if (player.gameObject.name == playerData.Name)
                 {
-                    player.Teleport(playerData.Position.ToVector3(), playerData.Y, true);
+                    player.Teleport(playerData.Position.ToVector3(), playerData.Y, false);
                     break;
                 }
             }

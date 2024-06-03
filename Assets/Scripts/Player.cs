@@ -10,9 +10,13 @@ using Steamworks;
 using Unity.Collections;
 using System.IO;
 using System;
+using System.Collections.Concurrent;
 [RequireComponent(typeof(CharacterController))]
 public class Player : NetworkBehaviour
 {
+    public VoiceChat VC;
+    public GameObject MicOn;
+    public GameObject MicOff;
     public GameObject ChatPrefab;
     public Transform ChatContent;
     public TMP_InputField ChatInput;
@@ -53,13 +57,17 @@ public class Player : NetworkBehaviour
     public GameObject pauseMenuUI;
     public GameObject LoadingScreen;
     public GameObject HandUI;
+    public GameObject BlockPickingMenu;
     public TextMeshProUGUI CodeText;
     public Slider RenderDistanceSlider;
     public Slider SensitivitySlider;
+    public Slider AudioSlider;
     public TextMeshProUGUI RenderDistanceText;
     public TextMeshProUGUI SensitivityText;
+    public TextMeshProUGUI AudioText;
     public Toggle graphicsToggle;
 
+    public bool PickingBlock = false;
     public bool IsPaused = false;
     public bool Chatting = false;
     private Player localPlayer;
@@ -94,20 +102,20 @@ public class Player : NetworkBehaviour
         Teleporting = true;
         controller.enabled = false;
         transform.position = Position;
-        Teleporting = false;
+        StartCoroutine(WaitForChunkTeleport(Position, false));
     }
 
     IEnumerator WaitForChunkTeleport(Vector3 Position, bool MakeNotInGround)
     {
+        Chunk currentChunk = chunkManager.GetChunk(transform.position);
+        bool inChunk = currentChunk != null;
+        AllowMovementUpdate = false;
+        if (!inChunk)
+        {
+            yield return new WaitForSeconds(3);
+        }
         if (MakeNotInGround)
         {
-            Chunk currentChunk = chunkManager.GetChunk(transform.position);
-            bool inChunk = currentChunk != null;
-            AllowMovementUpdate = false;
-            if (!inChunk)
-            {
-                yield return new WaitForSeconds(3);
-            }
             float yPos = 0;
             RaycastHit hit;
             if (Physics.Raycast(Position + Vector3.up * 100, Vector3.down, out hit, Mathf.Infinity, ~ignore))
@@ -115,8 +123,12 @@ public class Player : NetworkBehaviour
                 yPos = hit.point.y + 1;
                 transform.position = new Vector3(Position.x, yPos, Position.z);
             }
-            AllowMovementUpdate = true;
         }
+        else
+        {
+            transform.position = Position;
+        }
+        AllowMovementUpdate = true;
 
         Teleporting = false;
     }
@@ -127,6 +139,55 @@ public class Player : NetworkBehaviour
         controller = gameObject.GetComponent<CharacterController>();
         controller.enabled = false;
     }
+
+    private void FixedUpdate()
+    {
+        if (IsOwner)
+        {
+            UpdatePlayerPositions();
+        }
+    }
+
+    private void UpdatePlayerPositions()
+    {
+        Chunk currentChunk = chunkManager.GetChunk(transform.position);
+        if (currentChunk == null) return;   
+
+        Vector3Int chunkPosition = Vector3Int.FloorToInt(currentChunk.transform.position);
+        ConcurrentDictionary<string, Vector3> playerPositions = new ConcurrentDictionary<string, Vector3>();
+
+
+        playerPositions[gameObject.name] = transform.position;
+
+        Vector3 playerPos = transform.position;
+        Vector3Int playerAlignedGridPos = Vector3Int.FloorToInt(playerPos);
+        Vector3Int LocalPlayerPosition = Vector3Int.FloorToInt(currentChunk.transform.InverseTransformPoint(playerAlignedGridPos));
+
+        bool InRangeX = LocalPlayerPosition.x >= 0 && LocalPlayerPosition.x < chunkManager.ChunkSize;
+        bool InRangeY = LocalPlayerPosition.y >= 0 && LocalPlayerPosition.y < chunkManager.ChunkSize;
+        bool InRangeZ = LocalPlayerPosition.z >= 0 && LocalPlayerPosition.z < chunkManager.ChunkSize;
+
+
+        if (InRangeX && InRangeY && InRangeZ)
+        {
+            //VoxelData axis only goes up to size of ChunkSize
+            if (currentChunk.GetData()[LocalPlayerPosition.x, LocalPlayerPosition.y, LocalPlayerPosition.z] != 0)
+            {
+                playerPositions[gameObject.name] = playerPos + Vector3.up * 2;
+                TeleportPlayerCorrect(playerPositions[gameObject.name]);
+                if (AllowMovement)
+                {
+                    if (WaitForChunkCoroutine != null)
+                    {
+                        StopCoroutine(WaitForChunkCoroutine);
+                    }
+                    WaitForChunkCoroutine = StartCoroutine(WaitForChunk(.5f));
+                }
+                Debug.Log("Moving player");
+            }
+        }
+    }
+
 
     private void Start()
     {
@@ -140,6 +201,7 @@ public class Player : NetworkBehaviour
 
             RenderDistanceSlider.value = PlayerPrefs.GetInt("RenderDistance", 8);
             SensitivitySlider.value = PlayerPrefs.GetFloat("Sensitivity", 100);
+            AudioSlider.value = PlayerPrefs.GetFloat("Audio", 100);
 
             // Set the default graphics settings to high
             graphicsToggle.isOn = PlayerPrefs.GetInt("Graphics", 1) == 1;
@@ -354,6 +416,19 @@ public class Player : NetworkBehaviour
     }
 
     Coroutine WaitForChunkCoroutine;
+
+    [ServerRpc]
+    void SetSpawnServerRPC(Vector3 pos)
+    {
+        SetSpawnClientRPC(pos);
+    }
+    [ClientRpc]
+    void SetSpawnClientRPC(Vector3 pos)
+    {
+        GetLocal().chunkManager.SpawnPosition = pos;
+    }
+
+
     void Update()
     {
         if(localPlayer == null)
@@ -378,10 +453,15 @@ public class Player : NetworkBehaviour
 
 
         PlayerPrefs.SetFloat("Sensitivity", SensitivitySlider.value);
-    
+
+
+        PlayerPrefs.SetFloat("Audio", AudioSlider.value);
+
         RenderDistanceText.text = "Render Distance: " + RenderDistanceSlider.value;
         SensitivityText.text = "Sensitivity: " + SensitivitySlider.value / 100;
+        AudioText.text = "Volume: " + AudioSlider.value / 100;
 
+        AudioListener.volume = AudioSlider.value / 100;
         mouseSensitivity = SensitivitySlider.value * 10;
         chunkManager.renderDistance = (int)RenderDistanceSlider.value;
 
@@ -408,17 +488,37 @@ public class Player : NetworkBehaviour
             }
         }
 
+        if(Input.GetKeyDown(KeyCode.V) && !IsPaused && !Chatting && !PickingBlock)
+        {
+            VC.Muted =! VC.Muted;
+            MicOn.SetActive(!VC.Muted);
+            MicOff.SetActive(VC.Muted);
+        }
+
+        if (Input.GetKeyDown(KeyCode.E) && !IsPaused && !Chatting){
+            PickingBlock =! PickingBlock;
+            BlockPickingMenu.SetActive(PickingBlock);
+            if (PickingBlock)
+            {
+                Cursor.lockState = CursorLockMode.None;
+            }
+            else
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+            }
+        }
 
 
-        if (Input.GetKeyDown(KeyCode.T) && !IsPaused)
+        if (Input.GetKeyDown(KeyCode.T) && !IsPaused && !PickingBlock)
         {
             Cursor.lockState = CursorLockMode.None;
             ChatCanvas.gameObject.SetActive(true);
             ChatInput.Select();
             Chatting = true;
         }
-        if(Chatting && !IsPaused)
+        if(Chatting && !IsPaused && !PickingBlock)
         {
+            ChatInput.Select();
             if (Input.GetKeyDown(KeyCode.Return))
             {
                 UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
@@ -488,7 +588,7 @@ public class Player : NetworkBehaviour
                 {
                     if (IsHost)
                     {
-                        chunkManager.SpawnPosition = transform.position;
+                        SetSpawnServerRPC(transform.position);
                         chunkManager.SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
                         SendChatMessageLocal("<color=#00FFFF>Set Spawn position to (" + transform.position.x + ", " + transform.position.y + ", " + transform.position.z + ")</color>");
                     }
@@ -541,7 +641,7 @@ public class Player : NetworkBehaviour
         }
 
 
-        if (Input.GetKeyDown(KeyCode.Escape) && !Chatting)
+        if (Input.GetKeyDown(KeyCode.Escape) && !Chatting && !PickingBlock)
         {
             if (IsPaused)
             {
@@ -553,7 +653,7 @@ public class Player : NetworkBehaviour
             }
         }
 
-        if (Input.GetKeyDown(KeyCode.F5) && !IsPaused && !Chatting)
+        if (Input.GetKeyDown(KeyCode.F5) && !IsPaused && !Chatting && !PickingBlock)
         {
             if (camVal != 2)
             {
@@ -623,8 +723,8 @@ public class Player : NetworkBehaviour
 
     void MouseLook()
     {
-        float mouseX = !(!IsPaused && !Chatting) ? 0 : Input.GetAxisRaw("Mouse X") * mouseSensitivity * averageDeltaTime;
-        float mouseY = !(!IsPaused && !Chatting) ? 0 : Input.GetAxisRaw("Mouse Y") * mouseSensitivity * averageDeltaTime;
+        float mouseX = !(!IsPaused && !Chatting && !PickingBlock) ? 0 : Input.GetAxisRaw("Mouse X") * mouseSensitivity * averageDeltaTime;
+        float mouseY = !(!IsPaused && !Chatting && !PickingBlock) ? 0 : Input.GetAxisRaw("Mouse Y") * mouseSensitivity * averageDeltaTime;
 
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, -90f, 90f);
@@ -644,11 +744,11 @@ public class Player : NetworkBehaviour
             playerVelocity.y = 0f;
         }
 
-        Vector3 move = !(!IsPaused && !Chatting) ? Vector3.zero : transform.right * Input.GetAxisRaw("Horizontal") + transform.forward * Input.GetAxisRaw("Vertical");
+        Vector3 move = !(!IsPaused && !Chatting && !PickingBlock) ? Vector3.zero : transform.right * Input.GetAxisRaw("Horizontal") + transform.forward * Input.GetAxisRaw("Vertical");
         playerVelocity.x = move.x * playerSpeed;
         playerVelocity.z = move.z * playerSpeed;
 
-        if (Input.GetButtonDown("Jump") && groundedPlayer && !IsPaused && !Chatting)
+        if (Input.GetButtonDown("Jump") && groundedPlayer && !IsPaused && !Chatting && !PickingBlock)
         {
             playerVelocity.y += Mathf.Sqrt(jumpHeight * -3.0f * gravityValue);
         }

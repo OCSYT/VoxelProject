@@ -1,26 +1,31 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.UIElements;
+using UnityEngine.UI;
 
 public class BlockPlace : NetworkBehaviour
 {
     public float Dist = 25;
     public List<string> IgnoreBlocks = new List<string> { "air", "water", "lava" };
-    public List<Block> blockList; // List of available blocks to place
+    public List<Block> blockList; 
+    public Dictionary<byte, int[]> blockFaces = new Dictionary<byte, int[]>(); 
     public string LookingAt = "";
     public Vector3 ChunkPosition;
     private int selectedBlockIndex = 0;
     private ChunkManager chunkManager;
     public LayerMask ignore;
-    public LayerMask playerLayer;
     public MeshRenderer[] HandBlock;
     public float TextureSize;
     public float BlockSize;
     public Player player;
     public Transform blockPreview;
+    public GameObject BlockOption;
+    public Transform BlockContent;
+
 
     [HideInInspector]
     public List<(Vector3, byte)> BufferedBlockEvents = new List<(Vector3, byte) > ();
@@ -31,10 +36,44 @@ public class BlockPlace : NetworkBehaviour
         if (blockList == null)
         {
             blockList = new List<Block>();
-            foreach (var item in ChunkManager.Instance.BlockList)
+            foreach (KeyValuePair<byte, int[]> item in chunkManager.BlockFaces)
             {
-                if(IgnoreBlocks.Contains(item.Key.ToLower())) { continue; }
+                blockFaces.Add(item.Key, item.Value);
+            }
+
+            int index = 0;
+            foreach (var item in chunkManager.BlockList)
+            {
+                if (IgnoreBlocks.Contains(item.Key.ToLower())) { continue; }
                 blockList.Add(new Block(item.Key, item.Value));
+                if (IsOwner)
+                {
+                    GameObject BOption = GameObject.Instantiate(BlockOption, BlockContent);
+                    BOption.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = item.Key;
+
+                    int newTexID = (byte)blockFaces[item.Value][0];
+                    byte blockId = 0;
+                    if (blockId == 0)
+                    {
+                        blockId = (byte)item.Value;
+                    }
+                    int textureID = newTexID == 0 ? blockId - 1 : newTexID;
+
+                    float atlasSize = TextureSize;
+                    float _BlockSize = BlockSize;
+                    float blocksPerRow = atlasSize / _BlockSize;
+                    float row = Mathf.Floor(textureID / blocksPerRow);
+                    float col = textureID % blocksPerRow;
+                    float blockX = col * (_BlockSize / atlasSize);
+                    float blockY = row * (_BlockSize / atlasSize);
+                    float uvSize = 1.0f / blocksPerRow;
+
+                    BOption.transform.GetChild(0).GetComponent<RawImage>().uvRect = new Rect(blockX, blockY, 1 / _BlockSize, 1 / _BlockSize);
+
+                    int capturedIndex = index;
+                    BOption.GetComponent<Button>().onClick.AddListener(delegate { SwitchBlock(capturedIndex); });
+                    index++;
+                }
             }
         }
         if (IsOwner)
@@ -42,6 +81,13 @@ public class BlockPlace : NetworkBehaviour
             UpdateBlockVisual();
         }
     }
+
+    public void SwitchBlock(int index)
+    {
+        selectedBlockIndex = index;
+        UpdateBlockVisual();
+    }
+
 
     private string FindKeyFromValue(Dictionary<string, byte> dictionary, byte value)
     {
@@ -81,7 +127,8 @@ public class BlockPlace : NetworkBehaviour
     void Update()
     {
         if (IsOwner == false) return;
-        if (player.IsPaused || player.Chatting || !player.AllowMovement) return;
+        blockPreview.gameObject.SetActive(false);
+        if (player.IsPaused || player.Chatting || !player.AllowMovement || player.PickingBlock) return;
         float scroll = Input.GetAxis("Mouse ScrollWheel");
 
         if (scroll > 0f)
@@ -127,7 +174,6 @@ public class BlockPlace : NetworkBehaviour
         else
         {
             LookingAt = "Air";
-            blockPreview.gameObject.SetActive(false);
         }
 
 

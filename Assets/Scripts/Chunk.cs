@@ -265,66 +265,6 @@ public class Chunk : MonoBehaviour
     private bool isGeneratingMesh = false;
 
 
-    Player[] players = new Player[0];
-    private int prevPlayers;
-    private float timer = 0.1f; // Timer set to 0.1 seconds
-    private float timerReset = 0.1f; // Timer reset value
-    private int prevPlayersCount = 0; // Previous player count
-
-
-    private void FixedUpdate()
-    {
-        timer -= Time.fixedDeltaTime; // Decrement timer
-
-        if (timer <= 0f)
-        {
-            // Reset timer
-            timer = timerReset;
-
-            // Check for player count change
-            int networkCount = NetworkManager.Singleton.ConnectedClientsIds.Count;
-            if (networkCount != prevPlayersCount)
-            {
-                players = GameObject.FindObjectsOfType<Player>();
-                prevPlayersCount = networkCount;
-            }
-            UpdatePlayerPositions();
-        }
-    }
-
-    private void UpdatePlayerPositions()
-    {
-        Vector3Int chunkPosition = Vector3Int.FloorToInt(transform.position);
-        ConcurrentDictionary<string, Vector3> playerPositions = new ConcurrentDictionary<string, Vector3>();
-
-        // Populate player positions dictionary
-        for (int i = 0; i < players.Length; i++)
-        {
-            Player player = players[i];
-            playerPositions[player.gameObject.name] = player.transform.position;
-
-            Vector3 playerPos = player.transform.position;
-            Vector3Int playerAlignedGridPos = Vector3Int.FloorToInt(playerPos);
-            Vector3Int LocalPlayerPosition = Vector3Int.FloorToInt(transform.InverseTransformPoint(playerAlignedGridPos));
-
-            bool InRangeX = LocalPlayerPosition.x >= 0 && LocalPlayerPosition.x < ChunkSize;
-            bool InRangeY = LocalPlayerPosition.y >= 0 && LocalPlayerPosition.y < ChunkSize;
-            bool InRangeZ = LocalPlayerPosition.z >= 0 && LocalPlayerPosition.z < ChunkSize;
-
-
-            if (InRangeX && InRangeY && InRangeZ)
-            {
-                //VoxelData axis only goes up to size of ChunkSize
-                if (VoxelData[LocalPlayerPosition.x, LocalPlayerPosition.y, LocalPlayerPosition.z] != 0)
-                {
-                    playerPositions[player.gameObject.name] = playerPos + Vector3.up * 2;
-                    player.TeleportPlayerCorrect(playerPositions[player.gameObject.name]);
-                    StartCoroutine(player.WaitForChunk(.5f));
-                    Debug.Log("Moving player");
-                }
-            }
-        }
-    }
 
 
     public async void GenerateMesh(bool updateNeighbors)
@@ -502,7 +442,6 @@ public class Chunk : MonoBehaviour
             }
             await Task.CompletedTask;
         });
-
 
 
 

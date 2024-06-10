@@ -27,7 +27,7 @@ public class ChunkManagerEditor : Editor
         InitializeFoldoutsArray();
 
         ChunkManager chunkManager = (ChunkManager)target;
-        AtlasTexture = chunkManager.mat.mainTexture as Texture2D;
+        AtlasTexture = chunkManager.mat.GetTexture("_Atlas") as Texture2D;
         BlockSize = chunkManager.BlockSize;
         TextureSize = chunkManager.TextureSize;
     }

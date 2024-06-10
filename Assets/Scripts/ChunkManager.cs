@@ -11,6 +11,7 @@ using UnityEngine;
 using System.Xml.Serialization;
 using Newtonsoft.Json;
 using Unity.Netcode;
+using UnityEngine.UIElements.Experimental;
 
 public class ChunkManager : NetworkBehaviour
 {
@@ -95,13 +96,15 @@ public class ChunkManager : NetworkBehaviour
     {
         public SerializableVector3Int Position;
         public List<byte> Data;
+        public List<byte> DataDir;
 
         public ChunkData() { }
-        public ChunkData(Vector3Int position, byte[,,] data)
+        public ChunkData(Vector3Int position, byte[,,] data, byte[,,] dataDir)
         {
             Position = new SerializableVector3Int(position);
 
             Data = new List<byte>();
+            DataDir = new List<byte>();
             int sizeX = data.GetLength(0);
             int sizeY = data.GetLength(1);
             int sizeZ = data.GetLength(2);
@@ -112,6 +115,7 @@ public class ChunkManager : NetworkBehaviour
                     for (int z = 0; z < sizeZ; z++)
                     {
                         Data.Add(data[x, y, z]);
+                        DataDir.Add(dataDir[x, y, z]);
                     }
                 }
             }
@@ -130,13 +134,13 @@ public class ChunkManager : NetworkBehaviour
 
         public SaveData() { }
 
-        public SaveData(int seed, float time, bool flat, Vector3Int _SpawnPosition, Dictionary<Vector3Int, byte[,,]> chunkCache, List<PlayerData> players)
+        public SaveData(int seed, float time, bool flat, Vector3Int _SpawnPosition, Dictionary<Vector3Int, byte[,,]> chunkCache, Dictionary<Vector3Int, byte[,,]> chunkCacheDir, List<PlayerData> players)
         {
             SpawnPosition = new SerializableVector3Int(_SpawnPosition);
             Seed = seed;
             GameTime = time;
             IsSuperFlat = flat;
-            Chunks = chunkCache.Select(kvp => new ChunkData(kvp.Key, kvp.Value)).ToList();
+            Chunks = chunkCache.Select(kvp => new ChunkData(kvp.Key, kvp.Value, chunkCacheDir[kvp.Key])).ToList();
             Players = players;
         }
     }
@@ -153,19 +157,41 @@ public class ChunkManager : NetworkBehaviour
         }
         return null;
     }
-
+    [HideInInspector]
+    public bool saving;
     public void SaveGame(string filePath)
     {
+        saving = true;
         List<PlayerData> players = new List<PlayerData>();
-        foreach (var player in GameObject.FindObjectsOfType<Player>())
+        Player[] PlayerList = GameObject.FindObjectsOfType<Player>();
+        foreach (var player in PlayerList)
         {
             string playerName = player.gameObject.name;
             Vector3 playerPosition = (player.transform.position);
             players.Add(new PlayerData(playerName, playerPosition, player.transform.eulerAngles.y));
         }
 
+
+        foreach (PlayerData pd in LoadedPlayerData)
+        {
+            bool exists = false;
+            foreach (var player in PlayerList)
+            {
+                if (pd.Name == player.gameObject.name)
+                {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists)
+            {
+                players.Add(pd);
+            }
+        }
+
+        Debug.Log(players.Count);
         // Create SaveData object
-        SaveData saveData = new SaveData(seed, GameTime, IsSuperFlat, Vector3Int.FloorToInt(SpawnPosition), chunkCache, players);
+        SaveData saveData = new SaveData(seed, GameTime, IsSuperFlat, Vector3Int.FloorToInt(SpawnPosition), chunkCache, chunkCacheDirection, players);
 
 
 
@@ -187,9 +213,12 @@ public class ChunkManager : NetworkBehaviour
 
         File.WriteAllBytes(filePath, saveDataBytes);
 
-        GetHost().BlockPlace.BufferedBlockEvents.Clear();
-
+        if (GetHost())
+        {
+            GetHost().BlockPlace.BufferedBlockEvents.Clear();
+        }
         Debug.Log("Game saved successfully!");
+        saving = false;
     }
 
 
@@ -264,19 +293,28 @@ public class ChunkManager : NetworkBehaviour
             chunk => chunk.Position.ToVector3Int(),
             chunk => ConvertTo3DArray(chunk.Data, ChunkSize, ChunkSize, ChunkSize)
         );
+        chunkCacheDirection = saveData.Chunks.ToDictionary(
+            chunk => chunk.Position.ToVector3Int(),
+            chunk => ConvertTo3DArray(chunk.DataDir, ChunkSize, ChunkSize, ChunkSize)
+        );
 
 
         // Restore player positions
         foreach (Player player in GameObject.FindObjectsOfType<Player>())
         {
-            player.Teleport(saveData.SpawnPosition.ToVector3Int(), 0, true);
+            bool hasPoint = false;
             foreach (PlayerData playerData in saveData.Players)
             {
                 if (player.gameObject.name == playerData.Name)
                 {
                     player.Teleport(playerData.Position.ToVector3(), playerData.Y, false);
+                    hasPoint = true;
                     break;
                 }
+            }
+            if (!hasPoint)
+            {
+                player.Teleport(saveData.SpawnPosition.ToVector3Int(), 0, true);
             }
         }
         SpawnPosition = saveData.SpawnPosition.ToVector3Int();
@@ -306,7 +344,7 @@ public class ChunkManager : NetworkBehaviour
         public Color Light = Color.black;
     }
     public List<Block> Blocks = new List<Block>();
-
+    private List<PlayerData> LoadedPlayerData = new List<PlayerData> ();
     private bool IsSuperFlat;
     private int seed;
     public GameObject ChunkBorderPrefab;
@@ -317,16 +355,19 @@ public class ChunkManager : NetworkBehaviour
     public float BlockSize = 16;
     public Material mat;
     public Material transparent;
-    private List<byte> NoCollisonBlocks = new List<byte>();
-    private List<byte> TransparentBlocks = new List<byte>();
+    [HideInInspector]
+    public List<byte> NoCollisonBlocks = new List<byte>();
+    [HideInInspector]
+    public List<byte> TransparentBlocks = new List<byte>();
     public float Daylength = 1;
-    public float GameTime = 0;
+    private float GameTime = 0;
     public static ChunkManager Instance { get; private set; }
     public Dictionary<Vector3Int, Chunk> activeChunks = new Dictionary<Vector3Int, Chunk>();
     public Dictionary<Vector3Int, GameObject> activeChunksObj = new Dictionary<Vector3Int, GameObject>();
     private Vector3 previousTargetPosition;
     private float previousTargetRotation;
     private Dictionary<Vector3Int, byte[,,]> chunkCache = new Dictionary<Vector3Int, byte[,,]>();
+    private Dictionary<Vector3Int, byte[,,]> chunkCacheDirection = new Dictionary<Vector3Int, byte[,,]>();
     public Dictionary<string, byte> BlockList = new Dictionary<string, byte>();
     public Dictionary<byte, Color> BlockListLight = new Dictionary<byte, Color>();
     public Dictionary<byte, int[]> BlockFaces = new Dictionary<byte, int[]>();
@@ -358,11 +399,11 @@ public class ChunkManager : NetworkBehaviour
             BlockListLight.Add(block.Value, block.Light);
             BlockFaces.Add(block.Value, new int[] { block.FrontFace, block.BackFace, block.LeftFace, block.RightFace, block.TopFace, block.BottomFace });
         }
-
     }
 
     async public void StartGenerating()
     {
+
         seed = PlayerPrefs.GetInt("Seed", System.Guid.NewGuid().GetHashCode());
         IsSuperFlat = PlayerPrefs.GetInt("Superflat", 0) == 1;
 
@@ -408,16 +449,23 @@ public class ChunkManager : NetworkBehaviour
     private byte[,,] ConvertTo3DArray(List<byte> data, int sizeX, int sizeY, int sizeZ)
     {
         byte[,,] result = new byte[sizeX, sizeY, sizeZ];
-        int index = 0;
-        for (int x = 0; x < sizeX; x++)
+        try
         {
-            for (int y = 0; y < sizeY; y++)
+            int index = 0;
+            for (int x = 0; x < sizeX; x++)
             {
-                for (int z = 0; z < sizeZ; z++)
+                for (int y = 0; y < sizeY; y++)
                 {
-                    result[x, y, z] = data[index++];
+                    for (int z = 0; z < sizeZ; z++)
+                    {
+                        result[x, y, z] = data[index++];
+                    }
                 }
             }
+        }
+        catch
+        {
+
         }
         return result;
     }
@@ -571,6 +619,7 @@ public class ChunkManager : NetworkBehaviour
         activeChunksObj.Add(chunkPosition, newChunk);
 
         byte[,,] newData;
+        byte[,,] newDataDir;
         if (!chunkCache.ContainsKey(chunkPosition))
         {
             newData = SetTerrain(chunk, IsSuperFlat);
@@ -579,13 +628,24 @@ public class ChunkManager : NetworkBehaviour
         {
             newData = chunkCache[chunkPosition];
         }
+        if (!chunkCacheDirection.ContainsKey(chunkPosition))
+        {
+            newDataDir = new byte[ChunkSize, ChunkSize, ChunkSize];
+        }
+        else
+        {
+            newDataDir = chunkCacheDirection[chunkPosition];
+        }
+
+        chunk.SetDirectionData(newDataDir);
         chunk.SetData(newData);
 
         if (voxelDataForNonExistentChunks.ContainsKey(chunkPosition))
         {
             foreach (var voxelData in voxelDataForNonExistentChunks[chunkPosition])
             {
-                chunk.SetVoxel(voxelData.Item1.x, voxelData.Item1.y, voxelData.Item1.z, voxelData.Item2);
+                chunk.SetVoxel(voxelData.Item1.x, voxelData.Item1.y, voxelData.Item1.z, voxelData.Item3);
+                chunk.SetDirection(voxelData.Item1.x, voxelData.Item1.y, voxelData.Item1.z, voxelData.Item2);
             }
             voxelDataForNonExistentChunks.Remove(chunkPosition);
         }
@@ -801,34 +861,37 @@ public class ChunkManager : NetworkBehaviour
 
         if (!superflat)
         {
-            Parallel.For(0, ChunkSize, x =>
+            Task.Run(() =>
             {
-                for (int y = 0; y < ChunkSize; y++)
+                for (int x = 0; x < ChunkSize; x++)
                 {
-                    for (int z = 0; z < ChunkSize; z++)
+                    for (int y = 0; y < ChunkSize; y++)
                     {
-                        if (VoxelData[x, y, z] == BlockList["Grass"])
+                        for (int z = 0; z < ChunkSize; z++)
                         {
-                            if (y + 10 < ChunkSize && x + 2 < ChunkSize && z + 2 < ChunkSize
-                                && x - 2 > 0 && z - 2 > 0
-                                && random.NextDouble() > .975f && !HasWoodNeighbor(VoxelData, x, y, z, 3))
+                            if (VoxelData[x, y, z] == BlockList["Grass"])
                             {
-                                for (int i = y + 1; i < y + 4; i++)
+                                if (y + 10 < ChunkSize && x + 2 < ChunkSize && z + 2 < ChunkSize
+                                    && x - 2 > 0 && z - 2 > 0
+                                    && random.NextDouble() > .975f && !HasWoodNeighbor(VoxelData, x, y, z, 3))
                                 {
-                                    if (VoxelData[x, i, z] == 0)
+                                    for (int i = y + 1; i < y + 4; i++)
                                     {
-                                        VoxelData[x, i, z] = BlockList["Oak Log"];
-                                    }
-                                }
-                                for (int offsetY = y + 4; offsetY < y + 8; offsetY++)
-                                {
-                                    for (int offsetX = -2; offsetX <= 2; offsetX++)
-                                    {
-                                        for (int offsetZ = -2; offsetZ <= 2; offsetZ++)
+                                        if (VoxelData[x, i, z] == 0)
                                         {
-                                            if (VoxelData[x + offsetX, offsetY, z + offsetZ] == 0)
+                                            VoxelData[x, i, z] = BlockList["Oak Log"];
+                                        }
+                                    }
+                                    for (int offsetY = y + 4; offsetY < y + 8; offsetY++)
+                                    {
+                                        for (int offsetX = -2; offsetX <= 2; offsetX++)
+                                        {
+                                            for (int offsetZ = -2; offsetZ <= 2; offsetZ++)
                                             {
-                                                VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Leaves"];
+                                                if (VoxelData[x + offsetX, offsetY, z + offsetZ] == 0)
+                                                {
+                                                    VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Leaves"];
+                                                }
                                             }
                                         }
                                     }
@@ -903,10 +966,46 @@ public class ChunkManager : NetworkBehaviour
 
 
 
-    private Dictionary<Vector3Int, List<(Vector3Int, byte)>> voxelDataForNonExistentChunks = new Dictionary<Vector3Int, List<(Vector3Int, byte)>>();
+    private Dictionary<Vector3Int, List<(Vector3Int, byte, byte)>> voxelDataForNonExistentChunks = new Dictionary<Vector3Int, List<(Vector3Int, byte, byte)>>();
 
-    public void SetVoxelAtWorldPosition(Vector3 worldPosition, byte voxelValue, bool regenerate, bool useCache)
+    public void SetVoxelAtWorldPosition(Vector3 worldPosition, Vector3 worldNormal, byte voxelValue, bool regenerate, bool useCache)
     {
+
+        const byte DEFAULT = 0;
+        const byte NORTH = 1;
+        const byte EAST = 2;
+        const byte SOUTH = 3;
+        const byte WEST = 4;
+
+        byte FinalRotation = DEFAULT;
+
+        float northAngle = Vector3.Angle(worldNormal, Vector3.forward);
+        float eastAngle = Vector3.Angle(worldNormal, Vector3.right);
+        float southAngle = Vector3.Angle(worldNormal, Vector3.back);
+        float westAngle = Vector3.Angle(worldNormal, Vector3.left);
+
+        float minAngle = Mathf.Min(northAngle, eastAngle, southAngle, westAngle);
+
+
+        if (minAngle == northAngle)
+        {
+            FinalRotation = NORTH;
+        }
+        else if (minAngle == eastAngle)
+        {
+            FinalRotation = EAST;
+        }
+        else if (minAngle == southAngle)
+        {
+            FinalRotation = SOUTH;
+        }
+        else if (minAngle == westAngle)
+        {
+            FinalRotation = WEST;
+        }
+
+
+
         Vector3Int chunkPosition = new Vector3Int(
             Mathf.FloorToInt(worldPosition.x / ChunkSize),
             Mathf.FloorToInt(worldPosition.y / ChunkSize),
@@ -929,6 +1028,7 @@ public class ChunkManager : NetworkBehaviour
             Chunk chunk = activeChunks[chunkPosition];
 
             chunk.SetVoxel(localVoxelPosition.x, localVoxelPosition.y, localVoxelPosition.z, voxelValue);
+            chunk.SetDirection(localVoxelPosition.x, localVoxelPosition.y, localVoxelPosition.z, FinalRotation);
 
             if (regenerate)
             {
@@ -937,6 +1037,7 @@ public class ChunkManager : NetworkBehaviour
 
             if (useCache)
             {
+                chunkCacheDirection[chunkPosition] = chunk.GetDirectionData();
                 chunkCache[chunkPosition] = chunk.GetData();
             }
         }
@@ -944,9 +1045,9 @@ public class ChunkManager : NetworkBehaviour
         {
             if (!voxelDataForNonExistentChunks.ContainsKey(chunkPosition))
             {
-                voxelDataForNonExistentChunks[chunkPosition] = new List<(Vector3Int, byte)>();
+                voxelDataForNonExistentChunks[chunkPosition] = new List<(Vector3Int, byte, byte)>();
             }
-            voxelDataForNonExistentChunks[chunkPosition].Add((localVoxelPosition, voxelValue));
+            voxelDataForNonExistentChunks[chunkPosition].Add((localVoxelPosition, FinalRotation, voxelValue));
         }
     }
 

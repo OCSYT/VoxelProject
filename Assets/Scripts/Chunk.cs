@@ -15,6 +15,7 @@ public class Chunk : MonoBehaviour
 
     private int ChunkSize = 0;
     private byte[,,] VoxelData;
+    private byte[,,] VoxelDataDirection;
     private byte[] TransparentIDs;
     private byte[] NoCollisionIDs;
     private byte[] NoCollisionTransparentIDs;
@@ -59,6 +60,7 @@ public class Chunk : MonoBehaviour
         BlockFaces = ChunkManager.Instance.BlockFaces;
         currentPos = Position;
         VoxelData = new byte[_ChunkSize, _ChunkSize, _ChunkSize];
+        VoxelDataDirection = new byte[_ChunkSize, _ChunkSize, _ChunkSize];
 
         TextureSize = _TextureSize;
         BlockSize = _BlockSize;
@@ -145,6 +147,29 @@ public class Chunk : MonoBehaviour
             Debug.LogError("Invalid voxel position");
         }
         return VoxelData;
+    }
+    public byte[,,] SetDirection(int x, int y, int z, byte value)
+    {
+        if (IsValidPosition(x, y, z))
+        {
+            VoxelDataDirection[x, y, z] = value;
+        }
+        else
+        {
+            Debug.LogError("Invalid voxel position");
+        }
+        return VoxelDataDirection;
+    }
+
+    public byte[,,] SetDirectionData(byte[,,] data)
+    {
+        VoxelDataDirection = data;
+        return data;
+    }
+
+    public byte[,,] GetDirectionData()
+    {
+        return VoxelDataDirection;
     }
 
 
@@ -350,10 +375,130 @@ public class Chunk : MonoBehaviour
 
                                 Vector3[] quadVertices = new Vector3[4];
                                 bool inverted = false;
+
+
+                                byte BlockDirection = VoxelDataDirection[x,y,z];
+                                const byte DEFAULT = 0;
+                                const byte NORTH = 1;
+                                const byte EAST = 2;
+                                const byte SOUTH = 3;
+                                const byte WEST = 4;
+
+                                void SetBlockDirection(int face, int BlockDirectionVal)
+                                {
+                                    if (BlockDirectionVal == DEFAULT || BlockDirectionVal == NORTH) //default/north texture rotation for block
+                                    {
+                                        if (face == 0) //left face
+                                        {
+                                            directionBool[2] = true;
+                                        }
+                                        if (face == 1) //right face
+                                        {
+                                            directionBool[3] = true;
+                                        }
+                                        if (face == 2) //bottom face
+                                        {
+                                            directionBool[5] = true;
+                                        }
+                                        if (face == 3) //top face
+                                        {
+                                            directionBool[4] = true;
+                                        }
+                                        if (face == 4) //back face
+                                        {
+                                            directionBool[1] = true;
+                                        }
+                                        if (face == 5) //front face
+                                        {
+                                            directionBool[0] = true;
+                                        }
+                                    }
+                                    else if (BlockDirectionVal == EAST)
+                                    {
+                                        if (face == 0) //left face
+                                        {
+                                            directionBool[1] = true;
+                                        }
+                                        if (face == 1) //right face
+                                        {
+                                            directionBool[0] = true;
+                                        }
+                                        if (face == 2) //bottom face
+                                        {
+                                            directionBool[5] = true;
+                                        }
+                                        if (face == 3) //top face
+                                        {
+                                            directionBool[4] = true;
+                                        }
+                                        if (face == 4) //back face
+                                        {
+                                            directionBool[3] = true;
+                                        }
+                                        if (face == 5) //front face
+                                        {
+                                            directionBool[2] = true;
+                                        }
+                                    }
+                                    else if (BlockDirectionVal == SOUTH)
+                                    {
+                                        if (face == 0) //left face
+                                        {
+                                            directionBool[3] = true;
+                                        }
+                                        if (face == 1) //right face
+                                        {
+                                            directionBool[2] = true;
+                                        }
+                                        if (face == 2) //bottom face
+                                        {
+                                            directionBool[5] = true;
+                                        }
+                                        if (face == 3) //top face
+                                        {
+                                            directionBool[4] = true;
+                                        }
+                                        if (face == 4) //back face
+                                        {
+                                            directionBool[0] = true;
+                                        }
+                                        if (face == 5) //front face
+                                        {
+                                            directionBool[1] = true;
+                                        }
+                                    }
+                                    else if (BlockDirectionVal == WEST)
+                                    {
+                                        if (face == 0) //left face
+                                        {
+                                            directionBool[0] = true;
+                                        }
+                                        if (face == 1) //right face
+                                        {
+                                            directionBool[1] = true;
+                                        }
+                                        if (face == 2) //bottom face
+                                        {
+                                            directionBool[5] = true;
+                                        }
+                                        if (face == 3) //top face
+                                        {
+                                            directionBool[4] = true;
+                                        }
+                                        if (face == 4) //back face
+                                        {
+                                            directionBool[2] = true;
+                                        }
+                                        if (face == 5) //front face
+                                        {
+                                            directionBool[3] = true;
+                                        }
+                                    }
+                                }
+
                                 if (dx == -1) // Left face
                                 {
-
-                                    directionBool[2] = true;
+                                    SetBlockDirection(0, BlockDirection);
                                     quadVertices[0] = new Vector3(x, y, z);
                                     quadVertices[1] = new Vector3(x, y, z + 1);
                                     quadVertices[2] = new Vector3(x, y + 1, z);
@@ -362,7 +507,7 @@ public class Chunk : MonoBehaviour
                                 }
                                 else if (dx == 1) // Right face
                                 {
-                                    directionBool[3] = true;
+                                    SetBlockDirection(1, BlockDirection);
                                     quadVertices[0] = new Vector3(x + 1, y, z);
                                     quadVertices[1] = new Vector3(x + 1, y, z + 1);
                                     quadVertices[2] = new Vector3(x + 1, y + 1, z);
@@ -370,7 +515,7 @@ public class Chunk : MonoBehaviour
                                 }
                                 else if (dy == -1) // Bottom face
                                 {
-                                    directionBool[5] = true;
+                                    SetBlockDirection(2, BlockDirection);
                                     quadVertices[0] = new Vector3(x, y, z);
                                     quadVertices[1] = new Vector3(x, y, z + 1);
                                     quadVertices[2] = new Vector3(x + 1, y, z);
@@ -378,7 +523,7 @@ public class Chunk : MonoBehaviour
                                 }
                                 else if (dy == 1) // Top face
                                 {
-                                    directionBool[4] = true;
+                                    SetBlockDirection(3, BlockDirection);
                                     quadVertices[0] = new Vector3(x, y + 1, z);
                                     quadVertices[1] = new Vector3(x, y + 1, z + 1);
                                     quadVertices[2] = new Vector3(x + 1, y + 1, z);
@@ -387,7 +532,7 @@ public class Chunk : MonoBehaviour
                                 }
                                 else if (dz == -1) // Back face
                                 {
-                                    directionBool[1] = true;
+                                    SetBlockDirection(4, BlockDirection);
                                     quadVertices[0] = new Vector3(x, y, z);
                                     quadVertices[1] = new Vector3(x + 1, y, z);
                                     quadVertices[2] = new Vector3(x, y + 1, z);
@@ -395,7 +540,7 @@ public class Chunk : MonoBehaviour
                                 }
                                 else if (dz == 1) // Front face
                                 {
-                                    directionBool[0] = true;
+                                    SetBlockDirection(5, BlockDirection);
                                     quadVertices[0] = new Vector3(x, y, z + 1);
                                     quadVertices[1] = new Vector3(x + 1, y, z + 1);
                                     quadVertices[2] = new Vector3(x, y + 1, z + 1);

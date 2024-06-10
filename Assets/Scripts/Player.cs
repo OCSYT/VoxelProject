@@ -11,6 +11,8 @@ using Unity.Collections;
 using System.IO;
 using System;
 using System.Collections.Concurrent;
+using System.IO.Compression;
+using System.Runtime.Serialization.Formatters.Binary;
 [RequireComponent(typeof(CharacterController))]
 public class Player : NetworkBehaviour
 {
@@ -72,9 +74,10 @@ public class Player : NetworkBehaviour
     public bool Chatting = false;
     private Player localPlayer;
 
-    [HideInInspector]
+
     public NetworkVariable<float> GameTime = 
         new NetworkVariable<float>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
     [HideInInspector]
     public NetworkVariable<FixedString32Bytes> Username =
         new NetworkVariable<FixedString32Bytes>(new FixedString32Bytes(), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -171,7 +174,9 @@ public class Player : NetworkBehaviour
         if (InRangeX && InRangeY && InRangeZ)
         {
             //VoxelData axis only goes up to size of ChunkSize
-            if (currentChunk.GetData()[LocalPlayerPosition.x, LocalPlayerPosition.y, LocalPlayerPosition.z] != 0)
+
+            byte CurrentVoxel = currentChunk.GetData()[LocalPlayerPosition.x, LocalPlayerPosition.y, LocalPlayerPosition.z];
+            if (CurrentVoxel != 0 && !chunkManager.NoCollisonBlocks.Contains(CurrentVoxel))
             {
                 playerPositions[gameObject.name] = playerPos + Vector3.up * 2;
                 TeleportPlayerCorrect(playerPositions[gameObject.name]);
@@ -242,11 +247,6 @@ public class Player : NetworkBehaviour
 
     private void OnDestroy()
     {
-        if (NetworkManager.IsHost)
-        {
-            GetHost().BlockPlace.BufferedBlockEvents.Clear();
-            GetHost().chunkManager.SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
-        }
         SendChatMessageLocal("<color=yellow>" + Username.Value.ToString() + " has left");
     }
     public Player GetHost()
@@ -284,31 +284,117 @@ public class Player : NetworkBehaviour
     }
 
 
+    [Serializable]
+    public class SerializableVector3
+    {
+        public float X;
+        public float Y;
+        public float Z;
+
+        public SerializableVector3(float x, float y, float z)
+        {
+            X = x;
+            Y = y;
+            Z = z;
+        }
+
+        public SerializableVector3(Vector3 vector)
+        {
+            X = vector.x;
+            Y = vector.y;
+            Z = vector.z;
+        }
+
+        public Vector3 ToVector3()
+        {
+            return new Vector3(X, Y, Z);
+        }
+    }
+
+    [Serializable]
+    public class BlockEvent
+    {
+        public SerializableVector3 Vec1;
+        public SerializableVector3 Vec2;
+        public byte ByteVal;
+
+        public BlockEvent(SerializableVector3 vec1, SerializableVector3 vec2, byte byteVal)
+        {
+            Vec1 = vec1;
+            Vec2 = vec2;
+            ByteVal = byteVal;
+        }
+    }
+
+
+    public static byte[] CompressData(List<(Vector3, Vector3, byte)> blockEvents)
+    {
+        List<BlockEvent> events = new List<BlockEvent>();
+        foreach (var blockEvent in blockEvents)
+        {
+            events.Add(new BlockEvent(
+                new SerializableVector3(blockEvent.Item1),
+                new SerializableVector3(blockEvent.Item2),
+                blockEvent.Item3
+            ));
+        }
+
+        BinaryFormatter formatter = new BinaryFormatter();
+        using (MemoryStream memoryStream = new MemoryStream())
+        {
+            formatter.Serialize(memoryStream, events);
+            byte[] serializedData = memoryStream.ToArray();
+
+            using (MemoryStream compressedStream = new MemoryStream())
+            {
+                using (GZipStream gzipStream = new GZipStream(compressedStream, CompressionMode.Compress))
+                {
+                    gzipStream.Write(serializedData, 0, serializedData.Length);
+                }
+                return compressedStream.ToArray();
+            }
+        }
+    }
+
+    public static List<(Vector3, Vector3, byte)> DecompressData(byte[] compressedData)
+    {
+        using (MemoryStream compressedStream = new MemoryStream(compressedData))
+        {
+            using (GZipStream gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress))
+            {
+                using (MemoryStream decompressedStream = new MemoryStream())
+                {
+                    gzipStream.CopyTo(decompressedStream);
+                    decompressedStream.Position = 0;
+
+                    BinaryFormatter formatter = new BinaryFormatter();
+                    List<BlockEvent> events = (List<BlockEvent>)formatter.Deserialize(decompressedStream);
+
+                    List<(Vector3, Vector3, byte)> blockEvents = new List<(Vector3, Vector3, byte)>();
+                    foreach (var blockEvent in events)
+                    {
+                        blockEvents.Add((blockEvent.Vec1.ToVector3(), blockEvent.Vec2.ToVector3(), blockEvent.ByteVal));
+                    }
+                    return blockEvents;
+                }
+            }
+        }
+    }
+
+
     [ServerRpc(RequireOwnership =false)]
     public void SyncRequestServerRPC()
     {
-        List<(Vector3, byte)> BlockEvents = BlockPlace.BufferedBlockEvents;
-        Vector3[] VecList = new Vector3[BlockEvents.Count];
-        byte[] ByteList = new byte[BlockEvents.Count];
-        for (int i = 0; i < VecList.Length; i++)
-        {
-            VecList[i] = BlockEvents[i].Item1;
-            ByteList[i] = BlockEvents[i].Item2;
-        }
+        byte[] compressedData = CompressData(BlockPlace.BufferedBlockEvents);
+        SyncRequestClientRPC(compressedData);
 
-        SyncRequestClientRPC(VecList, ByteList);
     }
     [ClientRpc]
-    public void SyncRequestClientRPC(Vector3[] VecList, byte[] ByteList)
+    public void SyncRequestClientRPC(byte[] compressedData)
     {
-        List<(Vector3, byte)> BlockEvents = new List<(Vector3, byte)>();
-        for (int i = 0; i < VecList.Length; i++)
-        {
-            BlockEvents.Add((VecList[i], ByteList[i]));
-        }
-        StartCoroutine(WaitForPlayer(BlockEvents));
+        StartCoroutine(WaitForPlayer(DecompressData(compressedData)));
     }
-    IEnumerator WaitForPlayer(List<(Vector3, byte)> BlockEvents)
+    IEnumerator WaitForPlayer(List<(Vector3, Vector3, byte)> BlockEvents)
     {
         yield return new WaitUntil(() => localPlayer != null);
 
@@ -320,7 +406,7 @@ public class Player : NetworkBehaviour
     }
 
 
-    IEnumerator InitSync(List<(Vector3, byte)> BlockEvents)
+    IEnumerator InitSync(List<(Vector3, Vector3, byte)> BlockEvents)
     {
         if (!Synced.Value)
         {
@@ -411,7 +497,6 @@ public class Player : NetworkBehaviour
     [ServerRpc]
     public void SetTimeServerRPC(float Time)
     {
-        Debug.Log(Time);
         GetHost().GameTime.Value = Time;
     }
 
@@ -776,6 +861,14 @@ public class Player : NetworkBehaviour
         if (IsHost)
         {
             chunkManager.SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
+        }
+        StartCoroutine(WaitForQuit());
+    }
+    IEnumerator WaitForQuit()
+    {
+        while (chunkManager.saving)
+        {
+            yield return null;
         }
         NetworkManager.Singleton.Shutdown();
     }

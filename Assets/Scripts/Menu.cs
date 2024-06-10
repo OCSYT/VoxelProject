@@ -53,7 +53,7 @@ public class Menu : MonoBehaviour
         }
         else
         {
-            Debug.LogError("The specified folder does not exist: " + folderPath);
+            Debug.Log("The specified folder does not exist: " + folderPath);
         }
     }
 

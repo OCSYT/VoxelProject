@@ -13,6 +13,7 @@ using System;
 using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Reflection;
 [RequireComponent(typeof(CharacterController))]
 public class Player : NetworkBehaviour
 {
@@ -34,6 +35,7 @@ public class Player : NetworkBehaviour
     private Vector3 playerVelocity;
     private bool groundedPlayer;
     public float playerSpeed = 2.0f;
+    private float OriginalSpeed;
     public float jumpHeight = 1.0f;
     public float gravityValue = -9.81f;
     private int camVal;
@@ -73,7 +75,11 @@ public class Player : NetworkBehaviour
     public bool IsPaused = false;
     public bool Chatting = false;
     private Player localPlayer;
-
+    private bool Sprinting;
+    private bool Flying;
+    private float DoublePressTime = 0.25f;
+    private float LastSpacePressTime = 0f;
+    private bool WaitingForDoublePress = false;
 
     public NetworkVariable<float> GameTime = 
         new NetworkVariable<float>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -139,6 +145,7 @@ public class Player : NetworkBehaviour
 
     private void Awake()
     {
+        OriginalSpeed = playerSpeed;
         controller = gameObject.GetComponent<CharacterController>();
         controller.enabled = false;
     }
@@ -801,7 +808,9 @@ public class Player : NetworkBehaviour
             Moving.Value = false;
         }
 
-        Hand.transform.localPosition = new Vector3(Mathf.Sin(Time.time * playerSpeed * HandAmountX * MoveAmount) * HandAmount, Mathf.Sin(Time.time * playerSpeed * HandAmountY * MoveAmount) * HandAmount, 0);
+        Hand.transform.localPosition = Vector3.Lerp(Hand.transform.localPosition, 
+            new Vector3(Mathf.Sin(Time.time * playerSpeed * HandAmountX * MoveAmount) * HandAmount, Mathf.Sin(Time.time * playerSpeed * HandAmountY * MoveAmount) * HandAmount, 0)
+            , 15 * Time.deltaTime);
         Anim.transform.localRotation = Quaternion.Slerp(Anim.transform.localRotation, Quaternion.Euler(0, MovementDotY + 90, 0), 15 * Time.deltaTime);
         Head.transform.rotation = Quaternion.Euler(playerCamera.transform.eulerAngles.z, playerCamera.transform.eulerAngles.y + 90, playerCamera.transform.eulerAngles.x);
     }
@@ -829,18 +838,89 @@ public class Player : NetworkBehaviour
             playerVelocity.y = 0f;
         }
 
-        Vector3 move = !(!IsPaused && !Chatting && !PickingBlock) ? Vector3.zero : transform.right * Input.GetAxisRaw("Horizontal") + transform.forward * Input.GetAxisRaw("Vertical");
+        Vector3 move = !(!IsPaused && !Chatting && !PickingBlock) ? Vector3.zero : transform.right * Input.GetAxis("Horizontal") + transform.forward * Input.GetAxis("Vertical");
         playerVelocity.x = move.x * playerSpeed;
         playerVelocity.z = move.z * playerSpeed;
 
-        if (Input.GetButtonDown("Jump") && groundedPlayer && !IsPaused && !Chatting && !PickingBlock)
+        if (!IsPaused && !Chatting && !PickingBlock)
         {
-            playerVelocity.y += Mathf.Sqrt(jumpHeight * -3.0f * gravityValue);
+            Sprinting = Input.GetKey(KeyCode.LeftShift);
+            if (Sprinting)
+            {
+                playerSpeed = OriginalSpeed * 1.5f;
+            }
+            else
+            {
+                playerSpeed = OriginalSpeed;
+            }
         }
 
-        playerVelocity.y += gravityValue * Time.deltaTime;
+        if (!Flying)
+        {
+            if (!IsPaused && !Chatting && !PickingBlock)
+            {
+                if (Input.GetKeyDown(KeyCode.Space))
+                {
+                    if (WaitingForDoublePress && (Time.time - LastSpacePressTime) < DoublePressTime)
+                    {
+                        Flying = true;
+                        WaitingForDoublePress = false;
+                    }
+                    else
+                    {
+                        LastSpacePressTime = Time.time;
+                        WaitingForDoublePress = true;
+                    }
+
+                    if (groundedPlayer)
+                    {
+                        playerVelocity.y += Mathf.Sqrt(jumpHeight * -3.0f * gravityValue);
+                    }
+                }
+            }
+
+            playerVelocity.y += gravityValue * Time.deltaTime;
+        }
+        else
+        {
+            if (!IsPaused && !Chatting && !PickingBlock)
+            {
+                if (Input.GetKey(KeyCode.Space))
+                {
+                    playerVelocity.y = playerSpeed;
+                }
+                else if (Input.GetKey(KeyCode.LeftControl))
+                {
+                    playerVelocity.y = -playerSpeed;
+                }
+                else
+                {
+                    playerVelocity.y = 0;
+                }
+            }
+            else
+            {
+                playerVelocity.y = 0;
+            }
+
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                if (WaitingForDoublePress && (Time.time - LastSpacePressTime) < DoublePressTime)
+                {
+                    Flying = false;
+                    WaitingForDoublePress = false;
+                }
+                else
+                {
+                    LastSpacePressTime = Time.time;
+                    WaitingForDoublePress = true;
+                }
+            }
+        }
+
         controller.Move(playerVelocity * Time.deltaTime);
     }
+
 
     public void Resume()
     {

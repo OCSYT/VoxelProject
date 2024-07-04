@@ -11,7 +11,8 @@ using UnityEngine;
 using System.Xml.Serialization;
 using Newtonsoft.Json;
 using Unity.Netcode;
-using UnityEngine.UIElements.Experimental;
+
+
 
 public class ChunkManager : NetworkBehaviour
 {
@@ -380,8 +381,45 @@ public class ChunkManager : NetworkBehaviour
     [HideInInspector]
     public byte[] SaveDataBytes;
     public ShareFile ShareFile;
+    private float CPUClock;
+    float GetCPUClockSpeed()
+    {
+        float clockSpeed = 0;
+        System.Diagnostics.ProcessStartInfo processStartInfo = new System.Diagnostics.ProcessStartInfo("wmic", "cpu get MaxClockSpeed");
+        processStartInfo.RedirectStandardOutput = true;
+        processStartInfo.UseShellExecute = false;
+        processStartInfo.CreateNoWindow = true;
+
+        using (System.Diagnostics.Process process = new System.Diagnostics.Process())
+        {
+            process.StartInfo = processStartInfo;
+            process.Start();
+            process.WaitForExit();
+
+            string output = process.StandardOutput.ReadToEnd();
+            clockSpeed = ParseClockSpeed(output);
+        }
+
+        return clockSpeed;
+    }
+    float ParseClockSpeed(string output)
+    {
+        string[] lines = output.Trim().Split('\n');
+        if (lines.Length > 1)
+        {
+            if (float.TryParse(lines[1].Trim(), out float clockSpeed))
+            {
+                return clockSpeed;
+            }
+        }
+        return 3200f;
+    }
+
+
     private void Awake()
     {
+        CPUClock = 100000 / GetCPUClockSpeed();
+        Debug.Log(CPUClock);
         int index = 0;
         foreach (var block in Blocks)
         {
@@ -529,7 +567,7 @@ public class ChunkManager : NetworkBehaviour
 
             foreach (Vector3Int chunkPosition in sortedChunkPositions)
             {
-                await Task.Delay(16);
+                await Task.Delay(Mathf.RoundToInt(CPUClock));
                 if (cancelledGeneration)
                 {
                     cancelledGeneration = false;
@@ -721,7 +759,7 @@ public class ChunkManager : NetworkBehaviour
 
         await Task.Run(async () =>
         {
-            for (int x = 0; x < Mathf.Infinity; x++) // Infinite loop for x-axis
+            for (int x = 0; x < Mathf.Infinity; x++) 
             {
                 Vector3 voxelPosition2D = new Vector3(x, 0, 0);
                 float _Continentalness = Continentalness(voxelPosition2D, scale, 4, 0.5f, 2);
@@ -736,11 +774,11 @@ public class ChunkManager : NetworkBehaviour
                     if (y == perlinRounded && y > waterLevel)
                     {
                         FinalPos = new Vector3(x, perlinRounded + 2, 0);
-                        return; // Exit the loop once a land position is found
+                        return; 
                     }
                 }
 
-                await Task.Delay(1); // Add a delay to prevent freezing the process
+                await Task.Delay(1); 
             }
         });
 

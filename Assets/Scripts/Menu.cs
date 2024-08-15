@@ -112,10 +112,20 @@ public class Menu : MonoBehaviour
     {
         PlayerPrefs.SetInt("Superflat", superflattoggle.isOn ? 1 : 0);
         PlayerPrefs.SetInt("LoadingMode", 0);
-        PlayerPrefs.SetString("WorldName", WorldName.text);
+        string sanitizedWorldName = SanitizeFileName(WorldName.text);
+        PlayerPrefs.SetString("WorldName", sanitizedWorldName);
         PlayerPrefs.SetInt("Seed", Seed.text.GetHashCode());
         NetworkMenu.instance.Host();
     }
+    private string SanitizeFileName(string filePath)
+    {
+        foreach (char invalidChar in Path.GetInvalidFileNameChars())
+        {
+            filePath = filePath.Replace(invalidChar, '_');
+        }
+        return filePath;
+    }
+
 
     public void DeleteSave(string WorldName)
     {

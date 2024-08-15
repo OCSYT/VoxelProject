@@ -9,6 +9,7 @@ using UnityEngine.UI;
 
 public class BlockPlace : NetworkBehaviour
 {
+
     public float Dist = 25;
     public List<string> IgnoreBlocks = new List<string> { "air", "water", "lava" };
     public List<Block> blockList; 
@@ -25,7 +26,8 @@ public class BlockPlace : NetworkBehaviour
     public Transform blockPreview;
     public GameObject BlockOption;
     public Transform BlockContent;
-
+    public GameObject PlaceSFX;
+    public GameObject BreakSFX;
 
     [HideInInspector]
     public List<(Vector3, Vector3, byte)> BufferedBlockEvents = new List<(Vector3, Vector3, byte) > ();
@@ -197,6 +199,8 @@ public class BlockPlace : NetworkBehaviour
                 {
                     PlaceBlockServerRPC(targetPosition, Vector3.zero, 0, false, true, NetworkManager.LocalClientId);
                 }
+                GameObject SFX = GameObject.Instantiate(BreakSFX, targetPosition, Quaternion.identity);
+                Destroy(SFX, 5f);
             }
         }
         if (Input.GetMouseButtonDown(1))
@@ -225,6 +229,8 @@ public class BlockPlace : NetworkBehaviour
                 {
                     PlaceBlockServerRPC(targetPosition, BlockDir, blockList[selectedBlockIndex].blockId, false, true, NetworkManager.LocalClientId);
                 }
+                GameObject SFX = GameObject.Instantiate(PlaceSFX, targetPosition, Quaternion.identity);
+                Destroy(SFX, 5f);
             }
         }
     }
@@ -274,6 +280,16 @@ public class BlockPlace : NetworkBehaviour
         if (NetworkManager.LocalClientId != id)
         {
             ChunkManager.Instance.SetVoxelAtWorldPosition(position, normal, blockId, regenerate, true);
+            if (blockId != 0)
+            {
+                GameObject SFX = GameObject.Instantiate(PlaceSFX, position, Quaternion.identity);
+                Destroy(SFX, 5f);
+            }
+            else
+            {
+                GameObject SFX = GameObject.Instantiate(BreakSFX, position, Quaternion.identity);
+                Destroy(SFX, 5f);
+            }
         }
         if (buffer && IsHost)
         {

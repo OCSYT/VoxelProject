@@ -14,6 +14,8 @@ using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Reflection;
+
+
 [RequireComponent(typeof(CharacterController))]
 public class Player : NetworkBehaviour
 {
@@ -38,6 +40,7 @@ public class Player : NetworkBehaviour
     private float OriginalSpeed;
     public float jumpHeight = 1.0f;
     public float gravityValue = -9.81f;
+    private float CurrentGravity = 0;
     private int camVal;
     public Camera playerCamera;
     public Camera playerCameraBack;
@@ -70,6 +73,7 @@ public class Player : NetworkBehaviour
     public TextMeshProUGUI SensitivityText;
     public TextMeshProUGUI AudioText;
     public Toggle graphicsToggle;
+    public GameObject PostFX;
 
     public bool PickingBlock = false;
     public bool IsPaused = false;
@@ -80,7 +84,11 @@ public class Player : NetworkBehaviour
     private float DoublePressTime = 0.25f;
     private float LastSpacePressTime = 0f;
     private bool WaitingForDoublePress = false;
+    private bool InWater = false;
+    private bool CamInWater = false;
+    public GameObject CamWaterFX;
 
+    [HideInInspector]
     public NetworkVariable<float> GameTime = 
         new NetworkVariable<float>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
@@ -145,6 +153,7 @@ public class Player : NetworkBehaviour
 
     private void Awake()
     {
+        CurrentGravity = gravityValue;
         OriginalSpeed = playerSpeed;
         controller = gameObject.GetComponent<CharacterController>();
         controller.enabled = false;
@@ -155,6 +164,54 @@ public class Player : NetworkBehaviour
         if (IsOwner)
         {
             UpdatePlayerPositions();
+
+            Chunk currentChunk = chunkManager.GetChunk(transform.position);
+            if (currentChunk != null)
+            {
+
+                Vector3 playerPos = transform.position;
+                Vector3Int playerAlignedGridPos = Vector3Int.FloorToInt(playerPos);
+                Vector3Int LocalPlayerPosition = Vector3Int.FloorToInt(currentChunk.transform.InverseTransformPoint(playerAlignedGridPos));
+                bool InRangeX = LocalPlayerPosition.x >= 0 && LocalPlayerPosition.x < chunkManager.ChunkSize;
+                bool InRangeY = LocalPlayerPosition.y >= 0 && LocalPlayerPosition.y < chunkManager.ChunkSize;
+                bool InRangeZ = LocalPlayerPosition.z >= 0 && LocalPlayerPosition.z < chunkManager.ChunkSize;
+                if (InRangeX && InRangeY && InRangeZ)
+                {
+                    byte CurrentVoxel = currentChunk.GetData()[LocalPlayerPosition.x, LocalPlayerPosition.y, LocalPlayerPosition.z];
+                    InWater = CurrentVoxel == chunkManager.BlockList["Water"];
+                }
+            }
+
+
+            if (Camera.main)
+            {
+                Chunk CamChunk = chunkManager.GetChunk(Camera.main.transform.position);
+                if (CamChunk != null)
+                {
+                    Vector3 CamPos = Camera.main.transform.position;
+                    Vector3Int CamAlignedGridPos = Vector3Int.FloorToInt(CamPos);
+                    Vector3Int CamPlayerPosition = Vector3Int.FloorToInt(CamChunk.transform.InverseTransformPoint(CamAlignedGridPos));
+                    bool CamInRangeX = CamPlayerPosition.x >= 0 && CamPlayerPosition.x < chunkManager.ChunkSize;
+                    bool CamInRangeY = CamPlayerPosition.y >= 0 && CamPlayerPosition.y < chunkManager.ChunkSize;
+                    bool CamInRangeZ = CamPlayerPosition.z >= 0 && CamPlayerPosition.z < chunkManager.ChunkSize;
+                    if (CamInRangeX && CamInRangeY && CamInRangeZ)
+                    {
+                        byte CurrentVoxel = CamChunk.GetData()[CamPlayerPosition.x, CamPlayerPosition.y, CamPlayerPosition.z];
+                        CamInWater = CurrentVoxel == chunkManager.BlockList["Water"];
+                    }
+                }
+            }
+
+            CamWaterFX.SetActive(CamInWater);
+
+            if (InWater)
+            {
+                CurrentGravity = gravityValue / 10;
+            }
+            else
+            {
+                CurrentGravity = gravityValue;
+            }
         }
     }
 
@@ -215,11 +272,9 @@ public class Player : NetworkBehaviour
             SensitivitySlider.value = PlayerPrefs.GetFloat("Sensitivity", 100);
             AudioSlider.value = PlayerPrefs.GetFloat("Audio", 100);
 
-            // Set the default graphics settings to high
             graphicsToggle.isOn = PlayerPrefs.GetInt("Graphics", 1) == 1;
             SetGraphicsSettings(graphicsToggle.isOn);
 
-            // Add listener to the toggle
             graphicsToggle.onValueChanged.AddListener(delegate
             {
                 SetGraphicsSettings(graphicsToggle.isOn);
@@ -879,7 +934,7 @@ public class Player : NetworkBehaviour
                 }
             }
 
-            playerVelocity.y += gravityValue * Time.deltaTime;
+            playerVelocity.y += CurrentGravity * Time.deltaTime;
         }
         else
         {
@@ -897,24 +952,24 @@ public class Player : NetworkBehaviour
                 {
                     playerVelocity.y = 0;
                 }
+
+                if (Input.GetKeyDown(KeyCode.Space))
+                {
+                    if (WaitingForDoublePress && (Time.time - LastSpacePressTime) < DoublePressTime)
+                    {
+                        Flying = false;
+                        WaitingForDoublePress = false;
+                    }
+                    else
+                    {
+                        LastSpacePressTime = Time.time;
+                        WaitingForDoublePress = true;
+                    }
+                }
             }
             else
             {
                 playerVelocity.y = 0;
-            }
-
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                if (WaitingForDoublePress && (Time.time - LastSpacePressTime) < DoublePressTime)
-                {
-                    Flying = false;
-                    WaitingForDoublePress = false;
-                }
-                else
-                {
-                    LastSpacePressTime = Time.time;
-                    WaitingForDoublePress = true;
-                }
             }
         }
 
@@ -962,10 +1017,12 @@ public class Player : NetworkBehaviour
             if (highGraphics)
             {
                 mainLight.shadows = LightShadows.Soft;
+                PostFX.SetActive(true);
             }
             else
             {
                 mainLight.shadows = LightShadows.None;
+                PostFX.SetActive(false);
             }
         }
     }

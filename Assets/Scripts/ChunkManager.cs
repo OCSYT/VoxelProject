@@ -19,7 +19,6 @@ public class ChunkManager : NetworkBehaviour
 
     public AnimationCurve terrainCurve;
 
-
     [Serializable]
     public class SerializableVector3Int
     {
@@ -419,7 +418,6 @@ public class ChunkManager : NetworkBehaviour
     private void Awake()
     {
         CPUClock = 100000 / GetCPUClockSpeed();
-        Debug.Log(CPUClock);
         int index = 0;
         foreach (var block in Blocks)
         {
@@ -567,7 +565,7 @@ public class ChunkManager : NetworkBehaviour
 
             foreach (Vector3Int chunkPosition in sortedChunkPositions)
             {
-                await Task.Delay(Mathf.RoundToInt(CPUClock));
+                await Task.Delay(Mathf.RoundToInt(CPUClock/2));
                 if (cancelledGeneration)
                 {
                     cancelledGeneration = false;
@@ -710,7 +708,7 @@ public class ChunkManager : NetworkBehaviour
         float sampleY = ((position.z) + initialOffset) * frequency;
 
 
-        float perlinValue = (Mathf.PerlinNoise(sampleX, sampleY) - 0.5f) * 2;
+        float perlinValue = (Mathf.PerlinNoise(sampleX, sampleY)) * 2 - 1f;
 
         return perlinValue;
     }
@@ -725,24 +723,33 @@ public class ChunkManager : NetworkBehaviour
 
         for (int octave = 0; octave < octaves; octave++)
         {
-            // Convert position to float and adjust based on scale and frequency
             float sampleX = ((position.x) + initialOffset) * frequency;
             float sampleY = ((position.z) + initialOffset) * frequency;
 
-            // Sample the Perlin noise
             float perlinValue = Mathf.PerlinNoise(sampleX, sampleY) * 2f - 1f;
             continentalness += perlinValue * amplitude;
 
-            // Update amplitude and frequency for the next octave
             amplitude *= persistence;
             frequency *= lacunarity;
         }
 
-        // Normalize the result to range between 0 and 1
         continentalness = Mathf.Clamp01((continentalness + 1f) / 2f);
         continentalness = terrainCurve.Evaluate(continentalness);
 
         return continentalness;
+    }
+    float Humidity(Vector3 position, float scale)
+    {
+        float initialOffset = seed * 2 / 1000f;
+        float frequency = scale;
+
+        float sampleX = ((position.x) + initialOffset) * frequency;
+        float sampleY = ((position.z) + initialOffset) * frequency;
+
+
+        float perlinValue = (Mathf.PerlinNoise(sampleX, sampleY)) * 2 - 1f;
+
+        return perlinValue;
     }
 
 
@@ -767,7 +774,8 @@ public class ChunkManager : NetworkBehaviour
 
                 for (int y = 0; y < ChunkSize; y++)
                 {
-                    float perlinRaw = (_Continentalness * height) * _Errosion;
+
+                    float perlinRaw = (_Continentalness * height) - _Errosion * height;
                     float perlinValue = perlinRaw;
                     int perlinRounded = (Mathf.RoundToInt(perlinValue));
 
@@ -834,9 +842,10 @@ public class ChunkManager : NetworkBehaviour
                 {
                     Vector3 voxelPosition2D = chunkCornerWorldPos + new Vector3(x, 0, z);
                     float _Continentalness = Continentalness(voxelPosition2D, scale, 4, 0.5f, 2);
+                    float _Humidity = Humidity(voxelPosition2D, scale * 2);
                     float _Errosion = Errosion(voxelPosition2D, scale / 5);
 
-                    float perlinRaw = (_Continentalness * height) * _Errosion;
+                    float perlinRaw = (_Continentalness * height) - _Errosion * height;
 
                     Parallel.For(0, ChunkSize, y =>
                     {
@@ -869,7 +878,14 @@ public class ChunkManager : NetworkBehaviour
                                         }
                                         else
                                         {
-                                            voxelValue = BlockList["Grass"]; //grass
+                                            if (_Humidity < 0.25)
+                                            {
+                                                voxelValue = BlockList["Grass"]; //grass
+                                            }
+                                            else
+                                            {
+                                                voxelValue = BlockList["Sand"];
+                                            }
                                         }
                                     }
                                 }
@@ -899,6 +915,7 @@ public class ChunkManager : NetworkBehaviour
 
         if (!superflat)
         {
+            //surface decoration
             Task.Run(() =>
             {
                 for (int x = 0; x < ChunkSize; x++)
@@ -907,6 +924,43 @@ public class ChunkManager : NetworkBehaviour
                     {
                         for (int z = 0; z < ChunkSize; z++)
                         {
+                            if (VoxelData[x, y, z] == BlockList["Stone"])
+                            {
+                                double RandomValue = random.NextDouble();
+                                if (RandomValue > .95f)
+                                {
+                                    RandomValue = random.NextDouble();
+                                    if (RandomValue > 0.995f)
+                                    {
+                                        VoxelData[x, y, z] = BlockList["Diamond Ore"];
+                                    }
+                                    else if (RandomValue > 0.975f)
+                                    {
+                                        VoxelData[x, y, z] = BlockList["Emerald Ore"];
+                                    }
+                                    else if (RandomValue > 0.945f)
+                                    {
+                                        VoxelData[x, y, z] = BlockList["Gold Ore"];
+                                    }
+                                    else if (RandomValue > 0.895f)
+                                    {
+                                        VoxelData[x, y, z] = BlockList["Redstone Ore"];
+                                    }
+                                    else if (RandomValue > 0.825f)
+                                    {
+                                        VoxelData[x, y, z] = BlockList["Lapis Lazuli"];
+                                    }
+                                    else if (RandomValue > 0.675f)
+                                    {
+                                        VoxelData[x, y, z] = BlockList["Iron Ore"];
+                                    }
+                                    else
+                                    {
+                                        VoxelData[x, y, z] = BlockList["Coal Ore"];
+                                    }
+                                }
+                            }
+
                             if (VoxelData[x, y, z] == BlockList["Grass"])
                             {
                                 if (y + 10 < ChunkSize && x + 2 < ChunkSize && z + 2 < ChunkSize
@@ -931,6 +985,31 @@ public class ChunkManager : NetworkBehaviour
                                                     VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Leaves"];
                                                 }
                                             }
+                                        }
+                                    }
+                                }
+                            }
+                            else if (VoxelData[x, y, z] == BlockList["Sand"])
+                            {
+                                if (y + 3 < ChunkSize && random.NextDouble() > .99f)
+                                {
+                                    int cactusHeight = random.Next(1, 4); // Random height between 1 and 3 blocks
+
+                                    bool canPlaceCactus = true;
+                                    for (int i = 1; i <= cactusHeight; i++)
+                                    {
+                                        if (y + i >= ChunkSize || VoxelData[x, y + i, z] != 0)
+                                        {
+                                            canPlaceCactus = false;
+                                            break;
+                                        }
+                                    }
+
+                                    if (canPlaceCactus)
+                                    {
+                                        for (int i = 1; i <= cactusHeight; i++)
+                                        {
+                                            VoxelData[x, y + i, z] = BlockList["Cactus"];
                                         }
                                     }
                                 }
@@ -980,27 +1059,17 @@ public class ChunkManager : NetworkBehaviour
 
     public float Perlin3D(float x, float y, float z, float scale)
     {
-        x *= scale;
-        y *= scale;
-        z *= scale;
-        float xy = Mathf.PerlinNoise(x, y);
-        float xz = Mathf.PerlinNoise(x, z);
-        float yz = Mathf.PerlinNoise(y, z);
-        float yx = Mathf.PerlinNoise(y, x);
-        float zx = Mathf.PerlinNoise(z, x);
-        float zy = Mathf.PerlinNoise(z, y);
+        float XY = Mathf.PerlinNoise(x, y);
+        float YZ = Mathf.PerlinNoise(y, z);
+        float ZX = Mathf.PerlinNoise(z, x);
 
-        return (xy + xz + yz + yx + zx + zy) / 6;
+        float YX = Mathf.PerlinNoise(y, z);
+        float ZY = Mathf.PerlinNoise(z, y);
+        float XZ = Mathf.PerlinNoise(x, z);
 
+        float val = (XY + YZ + ZX + YX + ZY + XZ) / 6f;
+        return val * scale;
     }
-
-
-
-
-
-
-
-
 
 
 

@@ -19,9 +19,13 @@ public class Chunk : MonoBehaviour
     private byte[] TransparentIDs;
     private byte[] NoCollisionIDs;
     private byte[] NoCollisionTransparentIDs;
+    private byte[] NoPlayerCollisionIDs;
     private MeshFilter _MeshFilter;
     private MeshRenderer _MeshRenderer;
     private Mesh _Mesh;
+    private MeshFilter _NoPlayerCollisionMeshFilter;
+    private MeshRenderer _NoPlayerCollisionMeshRenderer;
+    private Mesh _NoPlayerCollisionMesh;
     private MeshFilter _MeshFilterTransparent;
     private MeshRenderer _MeshRendererTransparent;
     private Mesh _MeshTransparent;
@@ -36,6 +40,7 @@ public class Chunk : MonoBehaviour
     private float BlockSize = 16;
     public Vector3Int currentPos;
     private Transform Main;
+    private Transform NoPlayerCollisionObj;
     private Transform TransparentObj;
     private Transform NoCollisionObj;
     private Transform NoCollisionObjTransparent;
@@ -53,7 +58,7 @@ public class Chunk : MonoBehaviour
     }
 
 
-    public void Init(Material mat, Material transparentMat, byte[] transparent, byte[] nocollision, int _ChunkSize, float _TextureSize, float _BlockSize, Vector3Int Position)
+    public void Init(Material mat, Material transparentMat, byte[] transparent, byte[] nocollision, byte[] noplayercollision, int _ChunkSize, float _TextureSize, float _BlockSize, Vector3Int Position)
     {
         BlockList = ChunkManager.Instance.BlockList;
         BlockListLight = ChunkManager.Instance.BlockListLight;
@@ -67,6 +72,7 @@ public class Chunk : MonoBehaviour
         ChunkSize = _ChunkSize;
         TransparentIDs = transparent;
         NoCollisionTransparentIDs = transparent.Concat(nocollision).ToArray();
+        NoPlayerCollisionIDs = noplayercollision;
 
         NoCollisionIDs = nocollision;
 
@@ -79,6 +85,17 @@ public class Chunk : MonoBehaviour
         _MeshRenderer.sharedMaterial = mat;
         _Mesh = new Mesh();
         _MeshFilter.mesh = _Mesh;
+
+        NoPlayerCollisionObj = new GameObject("NoPlayerCollision").transform;
+        NoPlayerCollisionObj.transform.parent = transform;
+        NoPlayerCollisionObj.transform.localPosition = Vector3.zero;
+        NoPlayerCollisionObj.gameObject.layer = 10;
+        _NoPlayerCollisionMeshFilter = NoPlayerCollisionObj.transform.AddComponent<MeshFilter>();
+        _NoPlayerCollisionMeshRenderer = NoPlayerCollisionObj.transform.AddComponent<MeshRenderer>();
+        _NoPlayerCollisionMeshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
+        _NoPlayerCollisionMeshRenderer.sharedMaterial = transparentMat;
+        _NoPlayerCollisionMesh = new Mesh();
+        _NoPlayerCollisionMeshFilter.mesh = _NoPlayerCollisionMesh;
 
         TransparentObj = new GameObject("Transparent").transform;
         TransparentObj.transform.parent = transform;
@@ -309,6 +326,11 @@ public class Chunk : MonoBehaviour
         List<int> trianglesTransparent = new List<int>();
         List<Vector2> uvsTransparent = new List<Vector2>();
 
+        List<Vector3> verticesNoPlayerCollision = new List<Vector3>();
+        List<int> trianglesNoPlayerCollision = new List<int>();
+        List<Vector2> uvsNoPlayerCollision = new List<Vector2>();
+
+
         List<Vector3> verticesNoCollision = new List<Vector3>();
         List<int> trianglesNoCollision = new List<int>();
         List<Vector2> uvsNoCollision = new List<Vector2>();
@@ -369,8 +391,9 @@ public class Chunk : MonoBehaviour
                             {
                                 bool isTransparent = TransparentIDs.Contains(VoxelData[x, y, z]);
                                 bool hasNoCollision = NoCollisionIDs.Contains(VoxelData[x, y, z]);
-                                bool isMain = !isTransparent && !hasNoCollision;
-                                bool isTransparentNoCollision = isTransparent && hasNoCollision;
+                                bool noPlayerCollision = NoPlayerCollisionIDs.Contains(VoxelData[x, y, z]);
+                                bool isMain = !isTransparent && !hasNoCollision && !noPlayerCollision;
+                                bool isTransparentNoCollision = isTransparent && hasNoCollision && !noPlayerCollision;
                                 bool Inverted = false;
 
                                 Vector3[] quadVertices = new Vector3[4];
@@ -566,6 +589,11 @@ public class Chunk : MonoBehaviour
                                 {
                                     AddQuad(vertices, triangles, uvs, quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3], VoxelData[x, y, z], Inverted, directionBool);
                                 }
+                                else if (noPlayerCollision)
+                                {
+                                    AddQuad(verticesNoPlayerCollision, trianglesNoPlayerCollision, uvsNoPlayerCollision, quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3],
+       VoxelData[x, y, z], Inverted, directionBool);
+                                }
                                 else if (isTransparentNoCollision)
                                 {
                                     AddQuad(verticesNoCollisionTransparent, trianglesNoCollisionTransparent, uvsNoCollisionTransparent, quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3],
@@ -595,6 +623,11 @@ public class Chunk : MonoBehaviour
         if (Main)
         {
             UpdateMesh(_Mesh, vertices, triangles, uvs, Main.gameObject);
+        }
+
+        if (NoPlayerCollisionObj)
+        {
+            UpdateMesh(_NoPlayerCollisionMesh, verticesNoPlayerCollision, trianglesNoPlayerCollision, uvsNoPlayerCollision, NoPlayerCollisionObj.gameObject);
         }
 
         if (TransparentObj)
@@ -765,6 +798,7 @@ public class Chunk : MonoBehaviour
             bool NeighborisTransparent = ReturnType(NeighbourBlockID, TransparentIDs);
             bool NeighborisNoCollision = ReturnType(NeighbourBlockID, NoCollisionIDs);
             bool NeighborisNoCollisionTransparent = ReturnType(NeighbourBlockID, NoCollisionTransparentIDs);
+
 
 
             if (!isTransparent)

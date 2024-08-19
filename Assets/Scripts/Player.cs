@@ -87,6 +87,7 @@ public class Player : NetworkBehaviour
     private bool InWater = false;
     private bool CamInWater = false;
     public GameObject CamWaterFX;
+    public GameObject EarthMap;
 
     [HideInInspector]
     public NetworkVariable<float> GameTime = 
@@ -137,7 +138,7 @@ public class Player : NetworkBehaviour
             RaycastHit hit;
             if (Physics.Raycast(Position + Vector3.up * 100, Vector3.down, out hit, Mathf.Infinity, ~ignore))
             {
-                yPos = hit.point.y + 1;
+                yPos = hit.point.y + 2;
                 transform.position = new Vector3(Position.x, yPos, Position.z);
             }
         }
@@ -163,6 +164,19 @@ public class Player : NetworkBehaviour
     {
         if (IsOwner)
         {
+            if (chunkManager)
+            {
+                if (chunkManager.WorldType == "earth")
+                {
+                    if (!Chatting && !IsPaused && !Chatting && !PickingBlock)
+                    {
+                        EarthMap.SetActive(Input.GetKey(KeyCode.M));
+                    }
+                }
+            }
+
+
+
             UpdatePlayerPositions();
 
             Chunk currentChunk = chunkManager.GetChunk(transform.position);

@@ -11,6 +11,8 @@ using UnityEngine;
 using System.Xml.Serialization;
 using Newtonsoft.Json;
 using Unity.Netcode;
+using Newtonsoft.Json.Linq;
+using System.Net.Http;
 
 
 
@@ -126,7 +128,7 @@ public class ChunkManager : NetworkBehaviour
     public class SaveData
     {
         public int Seed;
-        public bool IsSuperFlat;
+        public string WorldType;
         public SerializableVector3Int SpawnPosition;
         public float GameTime;
         public List<ChunkData> Chunks;
@@ -134,12 +136,12 @@ public class ChunkManager : NetworkBehaviour
 
         public SaveData() { }
 
-        public SaveData(int seed, float time, bool flat, Vector3Int _SpawnPosition, Dictionary<Vector3Int, byte[,,]> chunkCache, Dictionary<Vector3Int, byte[,,]> chunkCacheDir, List<PlayerData> players)
+        public SaveData(int seed, float time, string worldtype, Vector3Int _SpawnPosition, Dictionary<Vector3Int, byte[,,]> chunkCache, Dictionary<Vector3Int, byte[,,]> chunkCacheDir, List<PlayerData> players)
         {
             SpawnPosition = new SerializableVector3Int(_SpawnPosition);
             Seed = seed;
             GameTime = time;
-            IsSuperFlat = flat;
+            WorldType = worldtype;
             Chunks = chunkCache.Select(kvp => new ChunkData(kvp.Key, kvp.Value, chunkCacheDir[kvp.Key])).ToList();
             Players = players;
         }
@@ -191,7 +193,7 @@ public class ChunkManager : NetworkBehaviour
 
         Debug.Log(players.Count);
         // Create SaveData object
-        SaveData saveData = new SaveData(seed, GameTime, IsSuperFlat, Vector3Int.FloorToInt(SpawnPosition), chunkCache, chunkCacheDirection, players);
+        SaveData saveData = new SaveData(seed, GameTime, WorldType, Vector3Int.FloorToInt(SpawnPosition), chunkCache, chunkCacheDirection, players);
 
 
 
@@ -271,7 +273,7 @@ public class ChunkManager : NetworkBehaviour
     {
         // Restore game state from SaveData object
         seed = saveData.Seed;
-        IsSuperFlat = saveData.IsSuperFlat;
+        WorldType = saveData.WorldType;
 
         if (local)
         {
@@ -339,13 +341,14 @@ public class ChunkManager : NetworkBehaviour
         public int BottomFace = 0;
         public bool Transparent;
         public bool NoCollision;
-
+        public bool NoPlayerCollision;
         [ColorUsage(true, true)]
         public Color Light = Color.black;
     }
     public List<Block> Blocks = new List<Block>();
     private List<PlayerData> LoadedPlayerData = new List<PlayerData> ();
-    private bool IsSuperFlat;
+    [HideInInspector]
+    public string WorldType;
     private int seed;
     public GameObject ChunkBorderPrefab;
     public bool ChunkBorders;
@@ -359,6 +362,8 @@ public class ChunkManager : NetworkBehaviour
     public List<byte> NoCollisonBlocks = new List<byte>();
     [HideInInspector]
     public List<byte> TransparentBlocks = new List<byte>();
+    [HideInInspector]
+    public List<byte> NoPlayerCollisionBlocks = new List<byte>();
     public float Daylength = 1;
     private float GameTime = 0;
     public static ChunkManager Instance { get; private set; }
@@ -430,6 +435,10 @@ public class ChunkManager : NetworkBehaviour
             {
                 NoCollisonBlocks.Add(block.Value);
             }
+            if (block.NoPlayerCollision)
+            {
+                NoPlayerCollisionBlocks.Add(block.Value);
+            }
 
             BlockList.Add(block.Name, block.Value);
             BlockListLight.Add(block.Value, block.Light);
@@ -441,7 +450,7 @@ public class ChunkManager : NetworkBehaviour
     {
 
         seed = PlayerPrefs.GetInt("Seed", System.Guid.NewGuid().GetHashCode());
-        IsSuperFlat = PlayerPrefs.GetInt("Superflat", 0) == 1;
+        WorldType = PlayerPrefs.GetString("WorldType", "");
 
         previousTargetPosition = Camera.main.transform.position;
         previousTargetRotation = Mathf.Round(Camera.main.transform.rotation.eulerAngles.y);
@@ -455,7 +464,13 @@ public class ChunkManager : NetworkBehaviour
             }
             else
             {
-                Vector3 SpawnPos = await GetFirstLandPosition(IsSuperFlat);
+                if(WorldType == "earth")
+                {
+                    waterLevel = Mathf.RoundToInt(0.05f * ChunkSize * 8);
+                }
+
+
+                Vector3 SpawnPos = await GetFirstLandPosition(WorldType);
                 Player p = GameObject.FindObjectOfType<Player>();
                 p.Teleport(SpawnPos, 0, true);
                 SpawnPosition = SpawnPos;
@@ -628,9 +643,7 @@ public class ChunkManager : NetworkBehaviour
 
     private bool generatingChunks = false;
 
-
-
-    private void CreateChunk(Vector3Int chunkPosition)
+    private async void CreateChunk(Vector3Int chunkPosition)
     {
         if (activeChunks.ContainsKey(chunkPosition))
             return;
@@ -649,7 +662,7 @@ public class ChunkManager : NetworkBehaviour
         }
 
         Chunk chunk = newChunk.AddComponent<Chunk>();
-        chunk.Init(mat, transparent, TransparentBlocks.ToArray(), NoCollisonBlocks.ToArray(), ChunkSize, TextureSize, BlockSize, chunkPosition);
+        chunk.Init(mat, transparent, TransparentBlocks.ToArray(), NoCollisonBlocks.ToArray(), NoPlayerCollisionBlocks.ToArray(), ChunkSize, TextureSize, BlockSize, chunkPosition);
 
         activeChunks.Add(chunkPosition, chunk);
         activeChunksObj.Add(chunkPosition, newChunk);
@@ -658,7 +671,7 @@ public class ChunkManager : NetworkBehaviour
         byte[,,] newDataDir;
         if (!chunkCache.ContainsKey(chunkPosition))
         {
-            newData = SetTerrain(chunk, IsSuperFlat);
+            newData = await SetTerrainAsync(chunk, WorldType);
         }
         else
         {
@@ -740,29 +753,68 @@ public class ChunkManager : NetworkBehaviour
     }
     float Humidity(Vector3 position, float scale)
     {
-        float initialOffset = seed * 2 / 1000f;
+        float initialOffset = seed / 100f;
         float frequency = scale;
 
-        float sampleX = ((position.x) + initialOffset) * frequency;
-        float sampleY = ((position.z) + initialOffset) * frequency;
+        float sampleX = ((position.x) - initialOffset) * frequency;
+        float sampleY = ((position.z) - initialOffset) * frequency;
 
 
-        float perlinValue = (Mathf.PerlinNoise(sampleX, sampleY)) * 2 - 1f;
+        float perlinValue = (Mathf.PerlinNoise(sampleX, sampleY));
 
         return perlinValue;
     }
 
 
-    async Task<Vector3> GetFirstLandPosition(bool superflat)
+    bool FoundEarthSpawn;
+    float EarthSpawn;
+    float EarthSpawnX;
+
+    IEnumerator GetEarthSpawn()
+    {
+        for (int x = 0; x < Mathf.Infinity; x++)
+        {
+            float[,] heights = FetchHeightDataFromTextureAsync(
+            0, 0, x * ChunkSize, 0, ChunkSize, ChunkSize, heightmapTexture).Result;
+
+            yield return null;
+
+            float height = Mathf.RoundToInt(heights[0,0] * ChunkSize);
+            Debug.Log("Height: " + height + ", Water Level: " + waterLevel);
+
+
+            if (height > waterLevel)
+            {
+                EarthSpawnX = x * ChunkSize;
+                EarthSpawn = height * 8;
+                FoundEarthSpawn = true;
+                break;
+            }
+        }
+    }
+
+    async Task<Vector3> GetFirstLandPosition(string worldType)
     {
 
-        if (superflat)
+        Vector3 FinalPos = Vector3.zero;
+        if (worldType == "superflat")
         {
             int flatHeight = worldFloor + superflatHeight;
             return new Vector3(0, flatHeight + 2, 0);
         }
+        else if (worldType == "earth")
+        {
+            StartCoroutine(GetEarthSpawn());
+            await Task.Run(async () =>
+            {
+                while(FoundEarthSpawn == false)
+                {
+                    await Task.Delay(1);
+                }
+            });
+            return new Vector3(0, EarthSpawn, EarthSpawnX);
+        }
 
-        Vector3 FinalPos = Vector3.zero;
 
         await Task.Run(async () =>
         {
@@ -794,30 +846,137 @@ public class ChunkManager : NetworkBehaviour
     }
 
 
+    private static Dictionary<string, Texture2D> textureCache = new Dictionary<string, Texture2D>();
 
-
-    byte[,,] SetTerrain(Chunk chunk, bool superflat)
+    // Fetch and cache texture from URL
+    async Task<Texture2D> GetTextureAsync(string url)
     {
+        if (textureCache.TryGetValue(url, out Texture2D cachedTexture))
+        {
+            return cachedTexture;
+        }
+
+        try
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                HttpResponseMessage response = await client.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    byte[] imageData = await response.Content.ReadAsByteArrayAsync();
+                    Texture2D texture = new Texture2D(2, 2); // Create a temporary texture
+                    texture.LoadImage(imageData); // Load image data into the texture
+
+                    textureCache[url] = texture;
+                    return texture;
+                }
+                else
+                {
+                    Debug.LogWarning("Failed to download texture.");
+                    return null;
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Request error: {e.Message}");
+            return null;
+        }
+    }
+
+
+
+    public Texture2D heightmapTexture;
+    public Texture2D vegetationTexture;
+    public Texture2D tempertureTexture;
+    public int heightmapScale = 4;
+    async Task<float[,]> FetchHeightDataFromTextureAsync(
+        float minLatitude, float maxLatitude, float minLongitude, float maxLongitude,
+        int chunkWidth, int chunkHeight, Texture2D _heightmapTexture)
+    {
+        float[,] heightData = new float[chunkWidth, chunkHeight];
+        int textureWidth = _heightmapTexture.width;
+        int textureHeight = _heightmapTexture.height;
+
+        // Calculate the boundaries of the chunk in texture coordinates
+        float minX = Mathf.InverseLerp(-2f * heightmapScale, 2f * heightmapScale, minLongitude) * textureWidth; // Assuming the longitude range is -180 to 180
+        float maxX = Mathf.InverseLerp(-2f * heightmapScale, 2f * heightmapScale, maxLongitude) * textureWidth;
+        float minY = Mathf.InverseLerp(-1f * heightmapScale, 1f * heightmapScale, minLatitude) * textureHeight; // Assuming the latitude range is -90 to 90
+        float maxY = Mathf.InverseLerp(-1f * heightmapScale, 1f * heightmapScale, maxLatitude) * textureHeight;
+
+        for (int x = 0; x < chunkWidth; x++)
+        {
+            for (int z = 0; z < chunkHeight; z++)
+            {
+                // Map chunk coordinates to texture coordinates
+                float u = Mathf.Lerp(minX, maxX, x / (float)chunkWidth) / textureWidth;
+                float v = Mathf.Lerp(minY, maxY, z / (float)chunkHeight) / textureHeight;
+
+                heightData[x, z] = _heightmapTexture.GetPixelBilinear(u, v).grayscale;
+            }
+        }
+
+        return heightData;
+    }
+
+
+
+    async Task<byte[,,]> SetTerrainAsync(Chunk chunk, string terrainType)
+    {
+        bool superflat = terrainType == "superflat";
+        bool earthGeneration = terrainType == "earth";
+
         System.Random random = new System.Random(seed + (int)chunk.transform.position.x
             + (int)chunk.transform.position.y + (int)chunk.transform.position.z);
 
         byte[,,] VoxelData = new byte[ChunkSize, ChunkSize, ChunkSize];
         Vector3 chunkCornerWorldPos = chunk.transform.position;
 
+        float minLatitude = chunkCornerWorldPos.z; // Adjust according to your coordinate system
+        float maxLatitude = chunkCornerWorldPos.z + ChunkSize;
+        float minLongitude = chunkCornerWorldPos.x;
+        float maxLongitude = chunkCornerWorldPos.x + ChunkSize;
+
+
+
         int flatHeight = worldFloor + superflatHeight;
         if (superflat)
         {
             waterLevel = worldFloor;
+        }
+        if (earthGeneration)
+        {
+            waterLevel = Mathf.RoundToInt(0.05f * ChunkSize * 8);
+        }
+
+        float[,] heights = new float[0, 0];
+        float[,] vegetation = new float[0, 0];
+        float[,] temperture = new float[0,0];
+        if (!superflat && earthGeneration)
+        {
+            heights = await FetchHeightDataFromTextureAsync(
+    minLatitude, maxLatitude, minLongitude, maxLongitude, ChunkSize, ChunkSize, heightmapTexture);
+
+            vegetation = await FetchHeightDataFromTextureAsync(
+    minLatitude, maxLatitude, minLongitude, maxLongitude, ChunkSize, ChunkSize, vegetationTexture);
+
+            temperture = await FetchHeightDataFromTextureAsync(
+    minLatitude, maxLatitude, minLongitude, maxLongitude, ChunkSize, ChunkSize, tempertureTexture);
         }
 
         for (int x = 0; x < ChunkSize; x++)
         {
             for (int z = 0; z < ChunkSize; z++)
             {
+
+                float veg = 0;
+                float temp = 0;
+
                 if (superflat)
                 {
 
-                    for (int y = 0; y < ChunkSize; y++)
+                    Parallel.For(0, ChunkSize, y =>
                     {
                         byte voxelValue = 0;
                         Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
@@ -836,31 +995,66 @@ public class ChunkManager : NetworkBehaviour
                         }
 
                         VoxelData[x, y, z] = voxelValue;
-                    }
+                    });
+
                 }
                 else
                 {
-                    Vector3 voxelPosition2D = chunkCornerWorldPos + new Vector3(x, 0, z);
-                    float _Continentalness = Continentalness(voxelPosition2D, scale, 4, 0.5f, 2);
-                    float _Humidity = Humidity(voxelPosition2D, scale * 2);
-                    float _Errosion = Errosion(voxelPosition2D, scale / 5);
 
-                    float perlinRaw = (_Continentalness * height) - _Errosion * height;
+                    Vector3 voxelPosition2D = chunkCornerWorldPos + new Vector3(x, 0, z);
+
+                    int heightRounded = 0;
+
+                    if (earthGeneration)
+                    {
+                        veg = vegetation[x, z];
+                        temp = 1 - temperture[x, z];
+                        float heightValue = heights[x, z];
+                        heightRounded = Mathf.RoundToInt(heightValue * ChunkSize * 8);
+                    }
+                    else
+                    {
+                        float _Continentalness = Continentalness(voxelPosition2D, scale, 4, 0.5f, 2);
+                        float _Humidity = Humidity(voxelPosition2D, scale * 2);
+                        float _Temp = 1 - Humidity(voxelPosition2D, scale * 2);
+                        float _Errosion = Errosion(voxelPosition2D, scale / 5);
+                        float perlinRaw = (_Continentalness * height) - _Errosion * height;
+                        veg = _Humidity;
+                        temp = 1 - _Temp;
+                        heightRounded = Mathf.RoundToInt(perlinRaw);
+                    }
 
                     Parallel.For(0, ChunkSize, y =>
                     {
+
                         Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
+
+
 
                         byte voxelValue = 0;
 
-                        float perlinValue = perlinRaw;
+                        float perlinValue = heightRounded;
 
                         int perlinRounded = (Mathf.RoundToInt(perlinValue));
                         if (voxelPosition.y >= worldFloor)
                         {
                             if (voxelPosition.y > perlinRounded && voxelPosition.y <= waterLevel)
                             {
-                                voxelValue = BlockList["Water"];
+                                if (!earthGeneration)
+                                {
+                                    if(voxelPosition.y == waterLevel && temp < 0.25)
+                                    {
+                                        voxelValue = BlockList["Ice"];
+                                    }
+                                    else
+                                    {
+                                        voxelValue = BlockList["Water"];
+                                    }
+                                }
+                                else
+                                {
+                                    voxelValue = BlockList["Water"];
+                                }
                             }
                             else
                             {
@@ -878,13 +1072,20 @@ public class ChunkManager : NetworkBehaviour
                                         }
                                         else
                                         {
-                                            if (_Humidity < 0.25)
+                                            if (temp < 0.25)
                                             {
-                                                voxelValue = BlockList["Grass"]; //grass
+                                                voxelValue = BlockList["Snow Grass"]; //grass
                                             }
                                             else
                                             {
-                                                voxelValue = BlockList["Sand"];
+                                                if (veg > 0.25)
+                                                {
+                                                    voxelValue = BlockList["Grass"]; //grass
+                                                }
+                                                else
+                                                {
+                                                    voxelValue = BlockList["Sand"];
+                                                }
                                             }
                                         }
                                     }
@@ -916,112 +1117,149 @@ public class ChunkManager : NetworkBehaviour
         if (!superflat)
         {
             //surface decoration
-            Task.Run(() =>
+            for (int x = 0; x < ChunkSize; x++)
             {
-                for (int x = 0; x < ChunkSize; x++)
+                for (int y = 0; y < ChunkSize; y++)
                 {
-                    for (int y = 0; y < ChunkSize; y++)
+                    for (int z = 0; z < ChunkSize; z++)
                     {
-                        for (int z = 0; z < ChunkSize; z++)
+                        if (VoxelData[x, y, z] == BlockList["Stone"])
                         {
-                            if (VoxelData[x, y, z] == BlockList["Stone"])
+                            double RandomValue = random.NextDouble();
+                            if (RandomValue > .95f)
                             {
-                                double RandomValue = random.NextDouble();
-                                if (RandomValue > .95f)
+                                RandomValue = random.NextDouble();
+                                if (RandomValue > 0.995f)
                                 {
-                                    RandomValue = random.NextDouble();
-                                    if (RandomValue > 0.995f)
-                                    {
-                                        VoxelData[x, y, z] = BlockList["Diamond Ore"];
-                                    }
-                                    else if (RandomValue > 0.975f)
-                                    {
-                                        VoxelData[x, y, z] = BlockList["Emerald Ore"];
-                                    }
-                                    else if (RandomValue > 0.945f)
-                                    {
-                                        VoxelData[x, y, z] = BlockList["Gold Ore"];
-                                    }
-                                    else if (RandomValue > 0.895f)
-                                    {
-                                        VoxelData[x, y, z] = BlockList["Redstone Ore"];
-                                    }
-                                    else if (RandomValue > 0.825f)
-                                    {
-                                        VoxelData[x, y, z] = BlockList["Lapis Lazuli"];
-                                    }
-                                    else if (RandomValue > 0.675f)
-                                    {
-                                        VoxelData[x, y, z] = BlockList["Iron Ore"];
-                                    }
-                                    else
-                                    {
-                                        VoxelData[x, y, z] = BlockList["Coal Ore"];
-                                    }
+                                    VoxelData[x, y, z] = BlockList["Diamond Ore"];
+                                }
+                                else if (RandomValue > 0.975f)
+                                {
+                                    VoxelData[x, y, z] = BlockList["Emerald Ore"];
+                                }
+                                else if (RandomValue > 0.945f)
+                                {
+                                    VoxelData[x, y, z] = BlockList["Gold Ore"];
+                                }
+                                else if (RandomValue > 0.895f)
+                                {
+                                    VoxelData[x, y, z] = BlockList["Redstone Ore"];
+                                }
+                                else if (RandomValue > 0.825f)
+                                {
+                                    VoxelData[x, y, z] = BlockList["Lapis Lazuli"];
+                                }
+                                else if (RandomValue > 0.675f)
+                                {
+                                    VoxelData[x, y, z] = BlockList["Iron Ore"];
+                                }
+                                else
+                                {
+                                    VoxelData[x, y, z] = BlockList["Coal Ore"];
                                 }
                             }
+                        }
 
-                            if (VoxelData[x, y, z] == BlockList["Grass"])
+
+
+                        if (VoxelData[x, y, z] == BlockList["Grass"] || VoxelData[x, y, z] == BlockList["Snow Grass"])
+                        {
+                            if (y + 10 < ChunkSize && x + 2 < ChunkSize && z + 2 < ChunkSize
+                            && x - 2 > 0 && z - 2 > 0
+                            && random.NextDouble() > .975f && !HasWoodNeighbor(VoxelData, x, y, z, 3))
                             {
-                                if (y + 10 < ChunkSize && x + 2 < ChunkSize && z + 2 < ChunkSize
-                                    && x - 2 > 0 && z - 2 > 0
-                                    && random.NextDouble() > .975f && !HasWoodNeighbor(VoxelData, x, y, z, 3))
+                                // Generate the Oak Log
+                                for (int i = y + 1; i < y + 4; i++)
                                 {
-                                    for (int i = y + 1; i < y + 4; i++)
+                                    if (VoxelData[x, i, z] == 0)
                                     {
-                                        if (VoxelData[x, i, z] == 0)
-                                        {
-                                            VoxelData[x, i, z] = BlockList["Oak Log"];
-                                        }
+                                        VoxelData[x, i, z] = BlockList["Oak Log"];
                                     }
-                                    for (int offsetY = y + 4; offsetY < y + 8; offsetY++)
+                                }
+
+                                // Generate the Leaves
+                                for (int offsetY = y + 4; offsetY < y + 8; offsetY++)
+                                {
+                                    for (int offsetX = -2; offsetX <= 2; offsetX++)
                                     {
-                                        for (int offsetX = -2; offsetX <= 2; offsetX++)
+                                        for (int offsetZ = -2; offsetZ <= 2; offsetZ++)
                                         {
-                                            for (int offsetZ = -2; offsetZ <= 2; offsetZ++)
+                                            bool isCornerOrEdge =
+                                                            (Math.Abs(offsetX) == 2 && Math.Abs(offsetZ) == 2) ||  // x-z corners
+                                                            (Math.Abs(offsetY) == y + 4 && Math.Abs(offsetX) == 2) ||  // x-y edges (bottom and top)
+                                                            (Math.Abs(offsetY) == y + 4 && Math.Abs(offsetZ) == 2) ||
+                                                             (Math.Abs(offsetY) == y + 7 && Math.Abs(offsetX) == 2) ||  // x-y edges (bottom and top)
+                                                            (Math.Abs(offsetY) == y + 7 && Math.Abs(offsetZ) == 2);  // y-z edges (bottom and top);  // y-z edges (bottom and top)
+
+                                            if (!isCornerOrEdge && VoxelData[x + offsetX, offsetY, z + offsetZ] == 0)
                                             {
-                                                if (VoxelData[x + offsetX, offsetY, z + offsetZ] == 0)
-                                                {
-                                                    VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Leaves"];
-                                                }
+                                                VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Leaves"];
                                             }
                                         }
                                     }
                                 }
                             }
-                            else if (VoxelData[x, y, z] == BlockList["Sand"])
+                            else
                             {
-                                if (y + 3 < ChunkSize && random.NextDouble() > .99f)
+                                if (y + 1 < ChunkSize && random.NextDouble() > 0.95f)
                                 {
-                                    int cactusHeight = random.Next(1, 4); // Random height between 1 and 3 blocks
+                                    int grassHeight = 1;
 
-                                    bool canPlaceCactus = true;
-                                    for (int i = 1; i <= cactusHeight; i++)
+                                    bool canPlaceGrass = true;
+                                    if (y + grassHeight >= ChunkSize || VoxelData[x, y + grassHeight, z] != 0)
                                     {
-                                        if (y + i >= ChunkSize || VoxelData[x, y + i, z] != 0)
-                                        {
-                                            canPlaceCactus = false;
-                                            break;
-                                        }
+                                        canPlaceGrass = false;
                                     }
 
-                                    if (canPlaceCactus)
+                                    if (canPlaceGrass)
                                     {
-                                        for (int i = 1; i <= cactusHeight; i++)
+                                        if (random.NextDouble() > 0.95f)
                                         {
-                                            VoxelData[x, y + i, z] = BlockList["Cactus"];
+                                            VoxelData[x, y + grassHeight, z] = BlockList["Roses"];
                                         }
+                                        else
+                                        {
+                                            VoxelData[x, y + grassHeight, z] = BlockList["Tall Grass"];
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else if (VoxelData[x, y, z] == BlockList["Sand"])
+                        {
+                            if (y + 3 < ChunkSize && random.NextDouble() > 0.99f)
+                            {
+                                int cactusHeight = random.Next(1, 4); // Random height between 1 and 3 blocks
+
+                                bool canPlaceCactus = true;
+                                for (int i = 1; i <= cactusHeight; i++)
+                                {
+                                    if (y + i >= ChunkSize || VoxelData[x, y + i, z] != 0)
+                                    {
+                                        canPlaceCactus = false;
+                                        break;
+                                    }
+                                }
+
+                                if (canPlaceCactus)
+                                {
+                                    for (int i = 1; i <= cactusHeight; i++)
+                                    {
+                                        VoxelData[x, y + i, z] = BlockList["Cactus"];
                                     }
                                 }
                             }
                         }
                     }
                 }
-            });
+            }
         }
 
         return VoxelData;
     }
+
+
+
 
 
 

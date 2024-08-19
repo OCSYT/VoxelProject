@@ -15,7 +15,7 @@ public class Menu : MonoBehaviour
     public TMP_InputField CodeField;
     public GameObject SavePrefab;
     public Transform Content;
-    public Toggle superflattoggle;
+    public TMP_Dropdown WorldTypeDropdown;
 
     void Start()
     {
@@ -110,7 +110,21 @@ public class Menu : MonoBehaviour
 
     public void StartGame()
     {
-        PlayerPrefs.SetInt("Superflat", superflattoggle.isOn ? 1 : 0);
+        string WorldTypeSetting = "";
+        if(WorldTypeDropdown.value == 0)
+        {
+            WorldTypeSetting = "normal";
+        }
+        else if (WorldTypeDropdown.value == 1)
+        {
+            WorldTypeSetting = "superflat";
+        }
+        else if(WorldTypeDropdown.value == 2)
+        {
+            WorldTypeSetting = "earth";
+        }
+        Debug.Log(WorldTypeSetting);
+        PlayerPrefs.SetString("WorldType", WorldTypeSetting);
         PlayerPrefs.SetInt("LoadingMode", 0);
         string sanitizedWorldName = SanitizeFileName(WorldName.text);
         PlayerPrefs.SetString("WorldName", sanitizedWorldName);

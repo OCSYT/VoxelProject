@@ -323,6 +323,78 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: -20, y: -20}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &462266328395087414
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4639744924394977173}
+  - component: {fileID: 8548821036197392092}
+  - component: {fileID: 840901733932687892}
+  m_Layer: 0
+  m_Name: RawImage
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &4639744924394977173
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 462266328395087414}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.25, y: 0.25, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 643487975674125398}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &8548821036197392092
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 462266328395087414}
+  m_CullTransparentMesh: 1
+--- !u!114 &840901733932687892
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 462266328395087414}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1344c3c82d62a2a41a3576d8abb8e3ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Texture: {fileID: 2800000, guid: 78aa3512f75d0f84d9eee02f3dc15681, type: 3}
+  m_UVRect:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
 --- !u!1 &519944801273391875
 GameObject:
   m_ObjectHideFlags: 0
@@ -1385,7 +1457,7 @@ MonoBehaviour:
   mouseSensitivity: 500
   ignore:
     serializedVersion: 2
-    m_Bits: 964
+    m_Bits: 1988
   Hand: {fileID: 3346454433991232853}
   HandAmount: 0.025
   HandAmountX: 0.78125
@@ -1408,6 +1480,7 @@ MonoBehaviour:
   IsPaused: 0
   Chatting: 0
   CamWaterFX: {fileID: 8651424122864544741}
+  EarthMap: {fileID: 4703392524293229935}
   GameTime:
     m_InternalValue: 45
   Username:
@@ -1662,7 +1735,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 0, y: 100, z: 0}
-  m_LocalScale: {x: 2000, y: 2000, z: 2000}
+  m_LocalScale: {x: 1000, y: 1000, z: 1000}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 7206329216063918418}
@@ -4294,15 +4367,15 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.01
-  far clip plane: 5000
+  near clip plane: 0.1
+  far clip plane: 1000
   field of view: 70
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 887
+    m_Bits: 1911
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
@@ -5010,15 +5083,15 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.01
-  far clip plane: 5000
+  near clip plane: 0.1
+  far clip plane: 1000
   field of view: 70
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 887
+    m_Bits: 1911
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
@@ -5074,6 +5147,79 @@ MonoBehaviour:
     mipBias: 0
     varianceClampScale: 0.9
     contrastAdaptiveSharpening: 0
+--- !u!1 &4703392524293229935
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 643487975674125398}
+  - component: {fileID: 6923389724858100125}
+  - component: {fileID: 2184602723626963754}
+  m_Layer: 0
+  m_Name: Map
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &643487975674125398
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4703392524293229935}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 4639744924394977173}
+  m_Father: {fileID: 9111515513429313338}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 1, y: 1}
+--- !u!222 &6923389724858100125
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4703392524293229935}
+  m_CullTransparentMesh: 1
+--- !u!114 &2184602723626963754
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4703392524293229935}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1344c3c82d62a2a41a3576d8abb8e3ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Texture: {fileID: 2800000, guid: d66cf27a48c6872489d8e0f6bf8b161e, type: 3}
+  m_UVRect:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
 --- !u!1 &4772946263013311732
 GameObject:
   m_ObjectHideFlags: 0
@@ -6247,6 +6393,7 @@ MonoBehaviour:
     BottomFace: 0
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Grass
     Value: 1
@@ -6258,6 +6405,7 @@ MonoBehaviour:
     BottomFace: 1
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Dirt
     Value: 2
@@ -6269,6 +6417,7 @@ MonoBehaviour:
     BottomFace: 1
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Stone
     Value: 3
@@ -6280,6 +6429,7 @@ MonoBehaviour:
     BottomFace: 2
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Cobblestone
     Value: 4
@@ -6291,6 +6441,7 @@ MonoBehaviour:
     BottomFace: 3
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Mossy Cobblestone
     Value: 45
@@ -6302,6 +6453,7 @@ MonoBehaviour:
     BottomFace: 244
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Snow Grass
     Value: 45
@@ -6313,6 +6465,7 @@ MonoBehaviour:
     BottomFace: 1
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Snow
     Value: 45
@@ -6324,6 +6477,7 @@ MonoBehaviour:
     BottomFace: 11
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Ice
     Value: 45
@@ -6335,6 +6489,7 @@ MonoBehaviour:
     BottomFace: 12
     Transparent: 1
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Stone Bricks
     Value: 5
@@ -6346,6 +6501,7 @@ MonoBehaviour:
     BottomFace: 4
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Bricks
     Value: 45
@@ -6357,6 +6513,7 @@ MonoBehaviour:
     BottomFace: 20
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Stone Slab
     Value: 45
@@ -6368,6 +6525,7 @@ MonoBehaviour:
     BottomFace: 19
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Oak Planks
     Value: 6
@@ -6379,6 +6537,7 @@ MonoBehaviour:
     BottomFace: 5
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Oak Log
     Value: 7
@@ -6390,6 +6549,7 @@ MonoBehaviour:
     BottomFace: 253
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Leaves
     Value: 8
@@ -6401,6 +6561,7 @@ MonoBehaviour:
     BottomFace: 7
     Transparent: 1
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Glass
     Value: 9
@@ -6412,6 +6573,7 @@ MonoBehaviour:
     BottomFace: 8
     Transparent: 1
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Glowstone
     Value: 10
@@ -6423,6 +6585,7 @@ MonoBehaviour:
     BottomFace: 9
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 1.4980394, g: 1.4980394, b: 1.4980394, a: 1}
   - Name: Sand
     Value: 11
@@ -6434,6 +6597,7 @@ MonoBehaviour:
     BottomFace: 10
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Gravel
     Value: 45
@@ -6445,6 +6609,7 @@ MonoBehaviour:
     BottomFace: 243
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Lava
     Value: 15
@@ -6456,6 +6621,7 @@ MonoBehaviour:
     BottomFace: 14
     Transparent: 0
     NoCollision: 1
+    NoPlayerCollision: 0
     Light: {r: 1, g: 0, b: 0, a: 1}
   - Name: Water
     Value: 16
@@ -6467,6 +6633,7 @@ MonoBehaviour:
     BottomFace: 15
     Transparent: 1
     NoCollision: 1
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Crafting Table
     Value: 17
@@ -6478,6 +6645,7 @@ MonoBehaviour:
     BottomFace: 44
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Furnace
     Value: 18
@@ -6489,6 +6657,7 @@ MonoBehaviour:
     BottomFace: 31
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Coal Ore
     Value: 19
@@ -6500,6 +6669,7 @@ MonoBehaviour:
     BottomFace: 250
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Iron Ore
     Value: 20
@@ -6511,6 +6681,7 @@ MonoBehaviour:
     BottomFace: 249
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Gold Ore
     Value: 21
@@ -6522,6 +6693,7 @@ MonoBehaviour:
     BottomFace: 248
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Lapis Lazuli
     Value: 22
@@ -6533,6 +6705,7 @@ MonoBehaviour:
     BottomFace: 247
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Redstone Ore
     Value: 23
@@ -6544,6 +6717,7 @@ MonoBehaviour:
     BottomFace: 252
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Emerald Ore
     Value: 31
@@ -6555,6 +6729,7 @@ MonoBehaviour:
     BottomFace: 246
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Diamond Ore
     Value: 24
@@ -6566,6 +6741,7 @@ MonoBehaviour:
     BottomFace: 251
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Lapis Block
     Value: 25
@@ -6577,6 +6753,7 @@ MonoBehaviour:
     BottomFace: 234
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0.042243958, b: 2, a: 1}
   - Name: Redstone Block
     Value: 26
@@ -6588,6 +6765,7 @@ MonoBehaviour:
     BottomFace: 239
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 2, g: 0, b: 0, a: 1}
   - Name: Iron Block
     Value: 27
@@ -6599,6 +6777,7 @@ MonoBehaviour:
     BottomFace: 235
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Gold Block
     Value: 28
@@ -6610,6 +6789,7 @@ MonoBehaviour:
     BottomFace: 236
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Emerald Block
     Value: 29
@@ -6621,6 +6801,7 @@ MonoBehaviour:
     BottomFace: 238
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 2, b: 0.23576927, a: 1}
   - Name: Diamond Block
     Value: 30
@@ -6632,6 +6813,7 @@ MonoBehaviour:
     BottomFace: 237
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: White Wool
     Value: 31
@@ -6643,6 +6825,7 @@ MonoBehaviour:
     BottomFace: 272
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Light Gray Wool
     Value: 32
@@ -6654,6 +6837,7 @@ MonoBehaviour:
     BottomFace: 288
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Grey Wool
     Value: 33
@@ -6665,6 +6849,7 @@ MonoBehaviour:
     BottomFace: 304
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Black Wool
     Value: 34
@@ -6676,6 +6861,7 @@ MonoBehaviour:
     BottomFace: 64
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Brown Wool
     Value: 35
@@ -6687,6 +6873,7 @@ MonoBehaviour:
     BottomFace: 80
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Red Wool
     Value: 36
@@ -6698,6 +6885,7 @@ MonoBehaviour:
     BottomFace: 96
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Orange Wool
     Value: 36
@@ -6709,6 +6897,7 @@ MonoBehaviour:
     BottomFace: 112
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Yellow Wool
     Value: 37
@@ -6720,6 +6909,7 @@ MonoBehaviour:
     BottomFace: 128
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Lime Wool
     Value: 38
@@ -6731,6 +6921,7 @@ MonoBehaviour:
     BottomFace: 144
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Green Wool
     Value: 39
@@ -6742,6 +6933,7 @@ MonoBehaviour:
     BottomFace: 160
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Cyan Wool
     Value: 40
@@ -6753,6 +6945,7 @@ MonoBehaviour:
     BottomFace: 176
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Light Blue Wool
     Value: 41
@@ -6764,6 +6957,7 @@ MonoBehaviour:
     BottomFace: 192
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Blue Wool
     Value: 42
@@ -6775,6 +6969,7 @@ MonoBehaviour:
     BottomFace: 208
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Purple Wool
     Value: 43
@@ -6786,6 +6981,7 @@ MonoBehaviour:
     BottomFace: 224
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Magenta Wool
     Value: 44
@@ -6797,6 +6993,7 @@ MonoBehaviour:
     BottomFace: 240
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Pink Wool
     Value: 45
@@ -6808,6 +7005,7 @@ MonoBehaviour:
     BottomFace: 17
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: TNT
     Value: 45
@@ -6819,6 +7017,7 @@ MonoBehaviour:
     BottomFace: 23
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Obsidian
     Value: 45
@@ -6830,6 +7029,7 @@ MonoBehaviour:
     BottomFace: 241
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Bedrock
     Value: 45
@@ -6841,6 +7041,7 @@ MonoBehaviour:
     BottomFace: 242
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Bookshelf
     Value: 45
@@ -6852,6 +7053,7 @@ MonoBehaviour:
     BottomFace: 5
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Chest
     Value: 45
@@ -6863,6 +7065,7 @@ MonoBehaviour:
     BottomFace: 27
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Cactus
     Value: 45
@@ -6874,7 +7077,33 @@ MonoBehaviour:
     BottomFace: 25
     Transparent: 0
     NoCollision: 0
+    NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Tall Grass
+    Value: 45
+    FrontFace: 26
+    BackFace: 26
+    LeftFace: 26
+    RightFace: 26
+    TopFace: 40
+    BottomFace: 40
+    Transparent: 1
+    NoCollision: 1
+    NoPlayerCollision: 1
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Roses
+    Value: 45
+    FrontFace: 41
+    BackFace: 41
+    LeftFace: 41
+    RightFace: 41
+    TopFace: 40
+    BottomFace: 40
+    Transparent: 1
+    NoCollision: 1
+    NoPlayerCollision: 1
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  WorldType: 
   ChunkBorderPrefab: {fileID: 6104295362550119401, guid: b2a1684a706b6a845ade531b06670eda,
     type: 3}
   ChunkBorders: 0
@@ -6886,6 +7115,7 @@ MonoBehaviour:
   transparent: {fileID: 2100000, guid: 438ebe16d49699246a667c1f3d8b599d, type: 2}
   NoCollisonBlocks: 
   TransparentBlocks: 
+  NoPlayerCollisionBlocks: 
   Daylength: 0.5
   DirectionalLight: {fileID: 6931730713607143711}
   AmbientColor: {r: 0.48235294, g: 0.53333336, b: 0.7254902, a: 0}
@@ -6899,6 +7129,10 @@ MonoBehaviour:
   scale: 0.005
   worldFloor: -100
   superflatHeight: 3
+  heightmapTexture: {fileID: 2800000, guid: cc9883f0b9899cf4cbafdddda0aefaa4, type: 3}
+  vegetationTexture: {fileID: 2800000, guid: 824216842d531794fbce54806bf73746, type: 3}
+  tempertureTexture: {fileID: 2800000, guid: 21a0b4d6a489b5047a5ce4c83dd4572e, type: 3}
+  heightmapScale: 3600
 --- !u!114 &9130220636842330622
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9043,6 +9277,7 @@ GameObject:
   - component: {fileID: 7237841989779441065}
   - component: {fileID: 5725579435375297898}
   - component: {fileID: 5845204696839342516}
+  - component: {fileID: 5591711901038172099}
   m_Layer: 6
   m_Name: UI
   m_TagString: Untagged
@@ -9062,6 +9297,7 @@ RectTransform:
   m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 643487975674125398}
   - {fileID: 183500833864994328}
   - {fileID: 7517380047138437569}
   m_Father: {fileID: 479376291634549093}
@@ -9134,6 +9370,22 @@ MonoBehaviour:
   m_BlockingMask:
     serializedVersion: 2
     m_Bits: 4294967295
+--- !u!114 &5591711901038172099
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8148781765431273072}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bae97d4bfa0bfc74bb45a7a7f08e4d48, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mainCamera: {fileID: 7031269575910039983}
+  mapImage: {fileID: 643487975674125398}
+  cameraMarker: {fileID: 4639744924394977173}
+  mapWorldSize: {x: 14400, y: 7200}
 --- !u!1 &8197322435049400919
 GameObject:
   m_ObjectHideFlags: 0
@@ -9284,15 +9536,15 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.01
-  far clip plane: 5000
+  near clip plane: 0.1
+  far clip plane: 1000
   field of view: 70
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 631
+    m_Bits: 1655
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0

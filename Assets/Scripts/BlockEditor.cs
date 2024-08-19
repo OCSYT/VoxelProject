@@ -84,6 +84,7 @@ public class ChunkManagerEditor : Editor
             EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 8, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("Light"));
             EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 9, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("Transparent"));
             EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 10, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("NoCollision"));
+            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 11, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("NoPlayerCollision"));
 
             if (AtlasTexture != null)
             {

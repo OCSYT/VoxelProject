@@ -7,7 +7,9 @@ using System.Threading.Tasks;
 using Unity.Netcode;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.UIElements;
+using static UnityEngine.Mesh;
 
 
 public class Chunk : MonoBehaviour
@@ -48,6 +50,7 @@ public class Chunk : MonoBehaviour
     private Dictionary<byte, Color> BlockListLight = new Dictionary<byte, Color>();
     private Dictionary<byte, int[]> BlockFaces = new Dictionary<byte, int[]>();
     bool isDestroyed = false;
+    private Dictionary<string, (List<Vector3> vertices, List<int> triangles, List<Vector2> uvs)> meshData;
 
     void Start()
     {
@@ -84,6 +87,7 @@ public class Chunk : MonoBehaviour
         _MeshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
         _MeshRenderer.sharedMaterial = mat;
         _Mesh = new Mesh();
+        _Mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         _MeshFilter.mesh = _Mesh;
 
         NoPlayerCollisionObj = new GameObject("NoPlayerCollision").transform;
@@ -95,6 +99,7 @@ public class Chunk : MonoBehaviour
         _NoPlayerCollisionMeshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
         _NoPlayerCollisionMeshRenderer.sharedMaterial = transparentMat;
         _NoPlayerCollisionMesh = new Mesh();
+        _NoPlayerCollisionMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         _NoPlayerCollisionMeshFilter.mesh = _NoPlayerCollisionMesh;
 
         TransparentObj = new GameObject("Transparent").transform;
@@ -105,6 +110,7 @@ public class Chunk : MonoBehaviour
         _MeshRendererTransparent.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
         _MeshRendererTransparent.sharedMaterial = transparentMat;
         _MeshTransparent = new Mesh();
+        _MeshTransparent.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         _MeshFilterTransparent.mesh = _MeshTransparent;
 
         NoCollisionObj = new GameObject("NoCollision").transform;
@@ -116,6 +122,7 @@ public class Chunk : MonoBehaviour
         _MeshRendererNoCollision.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
         _MeshRendererNoCollision.sharedMaterial = mat;
         _MeshNoCollision = new Mesh();
+        _MeshNoCollision.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         _MeshFilterNoCollision.mesh = _MeshNoCollision;
 
         NoCollisionObjTransparent = new GameObject("NoCollisionTransparent").transform;
@@ -127,6 +134,7 @@ public class Chunk : MonoBehaviour
         _MeshRendererNoCollisionTransparent.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
         _MeshRendererNoCollisionTransparent.sharedMaterial = transparentMat;
         _MeshNoCollisionTransparent = new Mesh();
+        _MeshNoCollisionTransparent.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         _MeshFilterNoCollisionTransparent.mesh = _MeshNoCollisionTransparent;
 
     }
@@ -198,116 +206,118 @@ public class Chunk : MonoBehaviour
     public void BlockChunkUpdate()
     {
         Vector3 chunkCornerWorldPos = transform.position;
+        var chunkSize = ChunkSize;
+        var waterLevel = ChunkManager.Instance.waterLevel;
+        var worldFloor = ChunkManager.Instance.worldFloor;
+        var airBlock = BlockList["Air"];
+        var waterBlock = BlockList["Water"];
 
         // Forward pass
-        Parallel.For(0, ChunkSize, x =>
+
+        Task.Run(() =>
         {
-            for (int y = 0; y < ChunkSize; y++)
+            Parallel.For(0, chunkSize, x =>
             {
-                for (int z = 0; z < ChunkSize; z++)
+                for (int y = 0; y < chunkSize; y++)
                 {
-                    Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
-
-                    // Check if current voxel is below water level and air
-                    if (voxelPosition.y <= ChunkManager.Instance.waterLevel && voxelPosition.y > ChunkManager.Instance.worldFloor && VoxelData[x, y, z] == BlockList["Air"])
+                    for (int z = 0; z < chunkSize; z++)
                     {
-                        // Check if any neighboring voxel is water
-                        bool hasWaterNeighbor = CheckForWaterNeighbor(x, y, z);
+                        Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
 
-                        // Fill with water only if there's a water neighbor
-                        if (hasWaterNeighbor)
+                        if (voxelPosition.y <= waterLevel && voxelPosition.y > worldFloor && VoxelData[x, y, z] == airBlock)
                         {
-                            VoxelData[x, y, z] = BlockList["Water"];
+                            if (CheckForWaterNeighbor(x, y, z))
+                            {
+                                VoxelData[x, y, z] = waterBlock;
+                            }
                         }
                     }
                 }
-            }
-        });
+            });
 
-        // Reverse pass
-        Parallel.For(0, ChunkSize, i =>
-        {
-            int x = ChunkSize - 1 - i;
-            for (int y = ChunkSize - 1; y >= 0; y--)
+            // Reverse pass
+            Parallel.For(0, chunkSize, i =>
             {
-                for (int z = ChunkSize - 1; z >= 0; z--)
+                int x = chunkSize - 1 - i;
+                for (int y = chunkSize - 1; y >= 0; y--)
                 {
-                    Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
-
-                    // Check if current voxel is below water level and air
-                    if (voxelPosition.y <= ChunkManager.Instance.waterLevel && voxelPosition.y > ChunkManager.Instance.worldFloor && VoxelData[x, y, z] == BlockList["Air"])
+                    for (int z = chunkSize - 1; z >= 0; z--)
                     {
-                        // Check if any neighboring voxel is water
-                        bool hasWaterNeighbor = CheckForWaterNeighbor(x, y, z);
+                        Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
 
-                        // Fill with water only if there's a water neighbor
-                        if (hasWaterNeighbor)
+                        if (voxelPosition.y <= waterLevel && voxelPosition.y > worldFloor && VoxelData[x, y, z] == airBlock)
                         {
-                            VoxelData[x, y, z] = BlockList["Water"];
+                            if (CheckForWaterNeighbor(x, y, z))
+                            {
+                                VoxelData[x, y, z] = waterBlock;
+                            }
                         }
                     }
                 }
-            }
+            });
         });
     }
+
 
 
     private bool CheckForWaterNeighbor(int x, int y, int z)
     {
         Vector3Int[] directions = new Vector3Int[]
         {
-                    new Vector3Int(-1, 0, 0),   // Left
-                    new Vector3Int(1, 0, 0),    // Right
-                    new Vector3Int(0, -1, 0),   // Bottom
-                    new Vector3Int(0, 1, 0),    // Top
-                    new Vector3Int(0, 0, -1),   // Back
-                    new Vector3Int(0, 0, 1)     // Front
+        new Vector3Int(-1, 0, 0),   // Left
+        new Vector3Int(1, 0, 0),    // Right
+        new Vector3Int(0, -1, 0),   // Bottom
+        new Vector3Int(0, 1, 0),    // Top
+        new Vector3Int(0, 0, -1),   // Back
+        new Vector3Int(0, 0, 1)     // Front
         };
 
-        bool found = false;
-        Parallel.For(0, directions.Length, i =>
+        var waterBlock = BlockList["Water"];
+        var chunkSize = ChunkSize;
+        var chunkManager = ChunkManager.Instance;
+
+        for (int i = 0; i < directions.Length; i++)
         {
             Vector3Int direction = directions[i];
-
 
             int neighborX = x + direction.x;
             int neighborY = y + direction.y;
             int neighborZ = z + direction.z;
-            if (neighborX < 0 || neighborX >= ChunkSize ||
-                neighborY < 0 || neighborY >= ChunkSize ||
-                neighborZ < 0 || neighborZ >= ChunkSize)
-            {
-                int neighborChunkX = (x + direction.x + ChunkSize) % ChunkSize;
-                int neighborChunkY = (y + direction.y + ChunkSize) % ChunkSize;
-                int neighborChunkZ = (z + direction.z + ChunkSize) % ChunkSize;
 
-                Chunk chunk = ChunkManager.Instance.GetNeighboringChunk(currentPos, direction.x, direction.y, direction.z);
-                if (chunk)
+            if (neighborX >= 0 && neighborX < chunkSize &&
+                neighborY >= 0 && neighborY < chunkSize &&
+                neighborZ >= 0 && neighborZ < chunkSize)
+            {
+                // Check within the same chunk
+                if (VoxelData[neighborX, neighborY, neighborZ] == waterBlock)
                 {
-                    if (chunk.GetData()[neighborChunkX, neighborChunkY, neighborChunkZ] == BlockList["Water"])
-                    {
-                        found = true;
-                    }
+                    return true;
                 }
             }
             else
             {
-                if (VoxelData[neighborX, neighborY, neighborZ] == BlockList["Water"])
+                // Check neighboring chunk
+                int neighborChunkX = (neighborX + chunkSize) % chunkSize;
+                int neighborChunkY = (neighborY + chunkSize) % chunkSize;
+                int neighborChunkZ = (neighborZ + chunkSize) % chunkSize;
+
+                Chunk neighborChunk = chunkManager.GetNeighboringChunk(currentPos, direction.x, direction.y, direction.z);
+                if (neighborChunk != null)
                 {
-                    found = true;
+                    if (neighborChunk.GetData()[neighborChunkX, neighborChunkY, neighborChunkZ] == waterBlock)
+                    {
+                        return true;
+                    }
                 }
             }
-        });
+        }
 
-        return found;
+        return false;
     }
 
 
 
     private bool isGeneratingMesh = false;
-
-
-
 
     public async void GenerateMesh(bool updateNeighbors)
     {
@@ -317,32 +327,10 @@ public class Chunk : MonoBehaviour
         CreateLights();
         BlockChunkUpdate();
 
-        List<Vector3> vertices = new List<Vector3>();
-        List<int> triangles = new List<int>();
-        List<Vector2> uvs = new List<Vector2>();
-
-
-        List<Vector3> verticesTransparent = new List<Vector3>();
-        List<int> trianglesTransparent = new List<int>();
-        List<Vector2> uvsTransparent = new List<Vector2>();
-
-        List<Vector3> verticesNoPlayerCollision = new List<Vector3>();
-        List<int> trianglesNoPlayerCollision = new List<int>();
-        List<Vector2> uvsNoPlayerCollision = new List<Vector2>();
-
-
-        List<Vector3> verticesNoCollision = new List<Vector3>();
-        List<int> trianglesNoCollision = new List<int>();
-        List<Vector2> uvsNoCollision = new List<Vector2>();
-
-        List<Vector3> verticesNoCollisionTransparent = new List<Vector3>();
-        List<int> trianglesNoCollisionTransparent = new List<int>();
-        List<Vector2> uvsNoCollisionTransparent = new List<Vector2>();
-
-
+        InitializeMeshData();
         Vector3 ChunkPosition = transform.position;
 
-        await Task.Run(async () =>
+        await Task.Run(() =>
         {
             for (int x = 0; x < ChunkSize; x++)
             {
@@ -350,317 +338,322 @@ public class Chunk : MonoBehaviour
                 {
                     for (int z = 0; z < ChunkSize; z++)
                     {
-                        if (isDestroyed)
+                        if (isDestroyed) return; // Exit early if destroyed
+
+                        byte blockId = VoxelData[x, y, z];
+                        if (blockId == BlockList["Air"]) continue;
+
+                        Vector3Int[] directions =
                         {
-                            break;
-                        }
-                        if (VoxelData[x, y, z] == BlockList["Air"])
-                            continue;
+                        new Vector3Int(-1, 0, 0), // Left
+                        new Vector3Int(1, 0, 0),  // Right
+                        new Vector3Int(0, -1, 0), // Bottom
+                        new Vector3Int(0, 1, 0),  // Top
+                        new Vector3Int(0, 0, -1), // Back
+                        new Vector3Int(0, 0, 1)   // Front
+                    };
 
 
-                        // Define the six directions as offsets from the current voxel position
-                        Vector3Int[] directions = new Vector3Int[]
+                        byte BlockDirection = VoxelDataDirection[x, y, z];
+
+                        foreach (Vector3Int direction in directions)
                         {
-                    new Vector3Int(-1, 0, 0),   // Left
-                    new Vector3Int(1, 0, 0),    // Right
-                    new Vector3Int(0, -1, 0),   // Bottom
-                    new Vector3Int(0, 1, 0),    // Top
-                    new Vector3Int(0, 0, -1),   // Back
-                    new Vector3Int(0, 0, 1)     // Front
-                        };
-                        bool[] directionBool = new bool[directions.Length];
-
-                        for (int i = 0; i < directions.Length; i++)
-                        {
-                            directionBool[0] = false;
-                            directionBool[1] = false;
-                            directionBool[2] = false;
-                            directionBool[3] = false;
-                            directionBool[4] = false;
-                            directionBool[5] = false;
-
-
-
-
-                            Vector3Int direction = directions[i];
                             int dx = direction.x;
                             int dy = direction.y;
                             int dz = direction.z;
 
-                            if (IsFaceVisible(x, y, z, dx, dy, dz))
-                            {
-                                bool isTransparent = TransparentIDs.Contains(VoxelData[x, y, z]);
-                                bool hasNoCollision = NoCollisionIDs.Contains(VoxelData[x, y, z]);
-                                bool noPlayerCollision = NoPlayerCollisionIDs.Contains(VoxelData[x, y, z]);
-                                bool isMain = !isTransparent && !hasNoCollision && !noPlayerCollision;
-                                bool isTransparentNoCollision = isTransparent && hasNoCollision && !noPlayerCollision;
-                                bool Inverted = false;
+                            if (!IsFaceVisible(x, y, z, dx, dy, dz)) continue;
 
-                                Vector3[] quadVertices = new Vector3[4];
-                                bool inverted = false;
+                            // Determine block properties once per iteration
+                            bool isTransparent = TransparentIDs.Contains(blockId);
+                            bool hasNoCollision = NoCollisionIDs.Contains(blockId);
+                            bool noPlayerCollision = NoPlayerCollisionIDs.Contains(blockId);
+                            bool isMain = !isTransparent && !hasNoCollision && !noPlayerCollision;
+                            bool isTransparentNoCollision = isTransparent && hasNoCollision && !noPlayerCollision;
+                            bool inverted = false;
 
+                            // Retrieve quad vertices and direction boolean
+                            (Vector3[] quadVertices, bool[] directionBool) = GetQuadVertices(dx, dy, dz, x, y, z, BlockDirection, ref inverted);
 
-                                byte BlockDirection = VoxelDataDirection[x,y,z];
-                                const byte DEFAULT = 0;
-                                const byte NORTH = 1;
-                                const byte EAST = 2;
-                                const byte SOUTH = 3;
-                                const byte WEST = 4;
+                            // Get lists for vertices, triangles, and UVs based on block properties
+                            List<Vector3> vertices = GetVerticesList(isMain, noPlayerCollision, isTransparentNoCollision, isTransparent, hasNoCollision);
+                            List<int> triangles = GetTrianglesList(isMain, noPlayerCollision, isTransparentNoCollision, isTransparent, hasNoCollision);
+                            List<Vector2> uvs = GetUVsList(isMain, noPlayerCollision, isTransparentNoCollision, isTransparent, hasNoCollision);
 
-                                void SetBlockDirection(int face, int BlockDirectionVal)
-                                {
-                                    if (BlockDirectionVal == DEFAULT || BlockDirectionVal == NORTH) //default/north texture rotation for block
-                                    {
-                                        if (face == 0) //left face
-                                        {
-                                            directionBool[2] = true;
-                                        }
-                                        if (face == 1) //right face
-                                        {
-                                            directionBool[3] = true;
-                                        }
-                                        if (face == 2) //bottom face
-                                        {
-                                            directionBool[5] = true;
-                                        }
-                                        if (face == 3) //top face
-                                        {
-                                            directionBool[4] = true;
-                                        }
-                                        if (face == 4) //back face
-                                        {
-                                            directionBool[1] = true;
-                                        }
-                                        if (face == 5) //front face
-                                        {
-                                            directionBool[0] = true;
-                                        }
-                                    }
-                                    else if (BlockDirectionVal == EAST)
-                                    {
-                                        if (face == 0) //left face
-                                        {
-                                            directionBool[1] = true;
-                                        }
-                                        if (face == 1) //right face
-                                        {
-                                            directionBool[0] = true;
-                                        }
-                                        if (face == 2) //bottom face
-                                        {
-                                            directionBool[5] = true;
-                                        }
-                                        if (face == 3) //top face
-                                        {
-                                            directionBool[4] = true;
-                                        }
-                                        if (face == 4) //back face
-                                        {
-                                            directionBool[3] = true;
-                                        }
-                                        if (face == 5) //front face
-                                        {
-                                            directionBool[2] = true;
-                                        }
-                                    }
-                                    else if (BlockDirectionVal == SOUTH)
-                                    {
-                                        if (face == 0) //left face
-                                        {
-                                            directionBool[3] = true;
-                                        }
-                                        if (face == 1) //right face
-                                        {
-                                            directionBool[2] = true;
-                                        }
-                                        if (face == 2) //bottom face
-                                        {
-                                            directionBool[5] = true;
-                                        }
-                                        if (face == 3) //top face
-                                        {
-                                            directionBool[4] = true;
-                                        }
-                                        if (face == 4) //back face
-                                        {
-                                            directionBool[0] = true;
-                                        }
-                                        if (face == 5) //front face
-                                        {
-                                            directionBool[1] = true;
-                                        }
-                                    }
-                                    else if (BlockDirectionVal == WEST)
-                                    {
-                                        if (face == 0) //left face
-                                        {
-                                            directionBool[0] = true;
-                                        }
-                                        if (face == 1) //right face
-                                        {
-                                            directionBool[1] = true;
-                                        }
-                                        if (face == 2) //bottom face
-                                        {
-                                            directionBool[5] = true;
-                                        }
-                                        if (face == 3) //top face
-                                        {
-                                            directionBool[4] = true;
-                                        }
-                                        if (face == 4) //back face
-                                        {
-                                            directionBool[2] = true;
-                                        }
-                                        if (face == 5) //front face
-                                        {
-                                            directionBool[3] = true;
-                                        }
-                                    }
-                                }
-
-                                if (dx == -1) // Left face
-                                {
-                                    SetBlockDirection(0, BlockDirection);
-                                    quadVertices[0] = new Vector3(x, y, z);
-                                    quadVertices[1] = new Vector3(x, y, z + 1);
-                                    quadVertices[2] = new Vector3(x, y + 1, z);
-                                    quadVertices[3] = new Vector3(x, y + 1, z + 1);
-                                    inverted = true;
-                                }
-                                else if (dx == 1) // Right face
-                                {
-                                    SetBlockDirection(1, BlockDirection);
-                                    quadVertices[0] = new Vector3(x + 1, y, z);
-                                    quadVertices[1] = new Vector3(x + 1, y, z + 1);
-                                    quadVertices[2] = new Vector3(x + 1, y + 1, z);
-                                    quadVertices[3] = new Vector3(x + 1, y + 1, z + 1);
-                                }
-                                else if (dy == -1) // Bottom face
-                                {
-                                    SetBlockDirection(2, BlockDirection);
-                                    quadVertices[0] = new Vector3(x, y, z);
-                                    quadVertices[1] = new Vector3(x, y, z + 1);
-                                    quadVertices[2] = new Vector3(x + 1, y, z);
-                                    quadVertices[3] = new Vector3(x + 1, y, z + 1);
-                                }
-                                else if (dy == 1) // Top face
-                                {
-                                    SetBlockDirection(3, BlockDirection);
-                                    quadVertices[0] = new Vector3(x, y + 1, z);
-                                    quadVertices[1] = new Vector3(x, y + 1, z + 1);
-                                    quadVertices[2] = new Vector3(x + 1, y + 1, z);
-                                    quadVertices[3] = new Vector3(x + 1, y + 1, z + 1);
-                                    inverted = true;
-                                }
-                                else if (dz == -1) // Back face
-                                {
-                                    SetBlockDirection(4, BlockDirection);
-                                    quadVertices[0] = new Vector3(x, y, z);
-                                    quadVertices[1] = new Vector3(x + 1, y, z);
-                                    quadVertices[2] = new Vector3(x, y + 1, z);
-                                    quadVertices[3] = new Vector3(x + 1, y + 1, z);
-                                }
-                                else if (dz == 1) // Front face
-                                {
-                                    SetBlockDirection(5, BlockDirection);
-                                    quadVertices[0] = new Vector3(x, y, z + 1);
-                                    quadVertices[1] = new Vector3(x + 1, y, z + 1);
-                                    quadVertices[2] = new Vector3(x, y + 1, z + 1);
-                                    quadVertices[3] = new Vector3(x + 1, y + 1, z + 1);
-                                    inverted = true;
-                                }
-                                if (inverted)
-                                {
-                                    // Swap all vertices
-                                    Vector3 temp = quadVertices[0];
-                                    quadVertices[0] = quadVertices[1];
-                                    quadVertices[1] = temp;
-
-                                    temp = quadVertices[2];
-                                    quadVertices[2] = quadVertices[3];
-                                    quadVertices[3] = temp;
-                                }
-
-
-
-
-                                if (isMain)
-                                {
-                                    AddQuad(vertices, triangles, uvs, quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3], VoxelData[x, y, z], Inverted, directionBool);
-                                }
-                                else if (noPlayerCollision)
-                                {
-                                    AddQuad(verticesNoPlayerCollision, trianglesNoPlayerCollision, uvsNoPlayerCollision, quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3],
-       VoxelData[x, y, z], Inverted, directionBool);
-                                }
-                                else if (isTransparentNoCollision)
-                                {
-                                    AddQuad(verticesNoCollisionTransparent, trianglesNoCollisionTransparent, uvsNoCollisionTransparent, quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3],
-                                           VoxelData[x, y, z], Inverted, directionBool);
-                                }
-                                else if (isTransparent)
-                                {
-                                    AddQuad(verticesTransparent, trianglesTransparent, uvsTransparent,
-                                           quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3], VoxelData[x, y, z], Inverted, directionBool);
-                                }
-                                else if (hasNoCollision)
-                                {
-                                    AddQuad(verticesNoCollision, trianglesNoCollision, uvsNoCollision, quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3], VoxelData[x, y, z], Inverted, directionBool);
-                                }
-                            }
+                            // Add quad to mesh data
+                            AddQuad(
+                                vertices,
+                                triangles,
+                                uvs,
+                                quadVertices[0], quadVertices[1], quadVertices[2], quadVertices[3],
+                                blockId, inverted, directionBool
+                            );
                         }
+
                     }
                 }
             }
-            await Task.CompletedTask;
         });
-
-
 
         if (isDestroyed || !isGeneratingMesh) return;
 
-        if (Main)
-        {
-            UpdateMesh(_Mesh, vertices, triangles, uvs, Main.gameObject);
-        }
-
-        if (NoPlayerCollisionObj)
-        {
-            UpdateMesh(_NoPlayerCollisionMesh, verticesNoPlayerCollision, trianglesNoPlayerCollision, uvsNoPlayerCollision, NoPlayerCollisionObj.gameObject);
-        }
-
-        if (TransparentObj)
-        {
-            UpdateMesh(_MeshTransparent, verticesTransparent, trianglesTransparent, uvsTransparent, TransparentObj.gameObject);
-        }
-
-        if (NoCollisionObj)
-        {
-            UpdateMesh(_MeshNoCollision, verticesNoCollision, trianglesNoCollision, uvsNoCollision, NoCollisionObj.gameObject);
-        }
-
-        if (NoCollisionObjTransparent)
-        {
-            UpdateMesh(_MeshNoCollisionTransparent, verticesNoCollisionTransparent, trianglesNoCollisionTransparent, uvsNoCollisionTransparent, NoCollisionObjTransparent.gameObject);
-        }
-        if (updateNeighbors)
-        {
-            UpdateNeighborChunks();
-        }
+        ApplyMeshData();
+        if (updateNeighbors) UpdateNeighborChunks();
 
         isGeneratingMesh = false;
     }
 
+    private void AddQuad(List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, Vector3 bottomLeft, Vector3 bottomRight, Vector3 topLeft, Vector3 topRight, int blockId, bool inverted, bool[] direction)
+    {
+        Vector3 center = Vector3.zero;
+        int vertIndex = vertices.Count;
 
-    void UpdateMesh(Mesh mesh, List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, GameObject obj)
+        int textureID = 0;
+
+        for (int i = 0; i < BlockFaces[(byte)(blockId)].Length; i++)
+        {
+            if (direction[i] == true)
+            {
+                int newTexID = BlockFaces[(byte)(blockId)][i];
+                textureID = newTexID == 0 ? blockId - 1 : newTexID;
+                break;
+            }
+        }
+
+
+        // Add vertices
+        vertices.Add(bottomLeft);
+        vertices.Add(bottomRight);
+        vertices.Add(topLeft);
+        vertices.Add(topRight);
+
+        float atlasSize = TextureSize;
+        float blockSize = BlockSize;
+        float blocksPerRow = atlasSize / blockSize;
+        float row = Mathf.Floor(textureID / blocksPerRow);
+        float col = textureID % blocksPerRow;
+        float blockX = col * (blockSize / atlasSize);
+        float blockY = row * (blockSize / atlasSize);
+        float uvSize = 1.0f / blocksPerRow;
+
+        Vector2[] quadUVs;
+        if (!inverted)
+        {
+            quadUVs = new Vector2[]
+            {
+            new Vector2(blockX, blockY),
+            new Vector2(blockX + uvSize, blockY),
+            new Vector2(blockX, blockY + uvSize),
+            new Vector2(blockX + uvSize, blockY + uvSize)
+            };
+        }
+        else
+        {
+            quadUVs = new Vector2[]
+            {
+            new Vector2(blockX + uvSize, blockY),
+            new Vector2(blockX, blockY),
+            new Vector2(blockX + uvSize, blockY + uvSize),
+            new Vector2(blockX, blockY + uvSize)
+            };
+        }
+
+        uvs.AddRange(quadUVs);
+
+        // Add triangles
+        triangles.Add(vertIndex);
+        triangles.Add(vertIndex + 2);
+        triangles.Add(vertIndex + 1);
+        triangles.Add(vertIndex + 2);
+        triangles.Add(vertIndex + 3);
+        triangles.Add(vertIndex + 1);
+    }
+
+
+    private void InitializeMeshData()
+    {
+        meshData = new Dictionary<string, (List<Vector3> vertices, List<int> triangles, List<Vector2> uvs)>
+        {
+            { "main", (new List<Vector3>(), new List<int>(), new List<Vector2>()) },
+            { "noPlayerCollision", (new List<Vector3>(), new List<int>(), new List<Vector2>()) },
+            { "transparent", (new List<Vector3>(), new List<int>(), new List<Vector2>()) },
+            { "noCollision", (new List<Vector3>(), new List<int>(), new List<Vector2>()) },
+            { "noCollisionTransparent", (new List<Vector3>(), new List<int>(), new List<Vector2>()) }
+        };
+    }
+
+        
+    private void ApplyMeshData()
+    {
+        if (Main) UpdateMesh(_Mesh, meshData["main"], Main.gameObject);
+        if (NoPlayerCollisionObj) UpdateMesh(_NoPlayerCollisionMesh, meshData["noPlayerCollision"], NoPlayerCollisionObj.gameObject);
+        if (TransparentObj) UpdateMesh(_MeshTransparent, meshData["transparent"], TransparentObj.gameObject);
+        if (NoCollisionObj) UpdateMesh(_MeshNoCollision, meshData["noCollision"], NoCollisionObj.gameObject);
+        if (NoCollisionObjTransparent) UpdateMesh(_MeshNoCollisionTransparent, meshData["noCollisionTransparent"], NoCollisionObjTransparent.gameObject);
+    }
+
+    private List<Vector3> GetVerticesList(bool isMain, bool noPlayerCollision, bool isTransparentNoCollision, bool isTransparent, bool hasNoCollision)
+    {
+        if (isMain) return meshData["main"].vertices;
+        if (noPlayerCollision) return meshData["noPlayerCollision"].vertices;
+        if (isTransparentNoCollision) return meshData["noCollisionTransparent"].vertices;
+        if (isTransparent) return meshData["transparent"].vertices;
+        if (hasNoCollision) return meshData["noCollision"].vertices;
+        return meshData["main"].vertices; // Default or fallback
+    }
+
+    private List<int> GetTrianglesList(bool isMain, bool noPlayerCollision, bool isTransparentNoCollision, bool isTransparent, bool hasNoCollision)
+    {
+        if (isMain) return meshData["main"].triangles;
+        if (noPlayerCollision) return meshData["noPlayerCollision"].triangles;
+        if (isTransparentNoCollision) return meshData["noCollisionTransparent"].triangles;
+        if (isTransparent) return meshData["transparent"].triangles;
+        if (hasNoCollision) return meshData["noCollision"].triangles;
+        return meshData["main"].triangles; // Default or fallback
+    }
+
+    private List<Vector2> GetUVsList(bool isMain, bool noPlayerCollision, bool isTransparentNoCollision, bool isTransparent, bool hasNoCollision)
+    {
+        if (isMain) return meshData["main"].uvs;
+        if (noPlayerCollision) return meshData["noPlayerCollision"].uvs;
+        if (isTransparentNoCollision) return meshData["noCollisionTransparent"].uvs;
+        if (isTransparent) return meshData["transparent"].uvs;
+        if (hasNoCollision) return meshData["noCollision"].uvs;
+        return meshData["main"].uvs; // Default or fallback
+    }
+
+    private (Vector3[], bool[] DirectionVal) GetQuadVertices(int dx, int dy, int dz, int x, int y, int z, byte blockDirection, ref bool inverted)
+    {
+        Vector3[] quadVertices = new Vector3[4];
+        bool[] DirectionBool = new bool[6];
+
+        if (dx == -1) // Left face
+        {
+            DirectionBool = SetBlockDirection(0, blockDirection);
+            quadVertices[0] = new Vector3(x, y, z);
+            quadVertices[1] = new Vector3(x, y, z + 1);
+            quadVertices[2] = new Vector3(x, y + 1, z);
+            quadVertices[3] = new Vector3(x, y + 1, z + 1);
+            inverted = true;
+        }
+        else if (dx == 1) // Right face
+        {
+            DirectionBool = SetBlockDirection(1, blockDirection);
+            quadVertices[0] = new Vector3(x + 1, y, z);
+            quadVertices[1] = new Vector3(x + 1, y, z + 1);
+            quadVertices[2] = new Vector3(x + 1, y + 1, z);
+            quadVertices[3] = new Vector3(x + 1, y + 1, z + 1);
+        }
+        else if (dy == -1) // Bottom face
+        {
+            DirectionBool = SetBlockDirection(2, blockDirection);
+            quadVertices[0] = new Vector3(x, y, z);
+            quadVertices[1] = new Vector3(x, y, z + 1);
+            quadVertices[2] = new Vector3(x + 1, y, z);
+            quadVertices[3] = new Vector3(x + 1, y, z + 1);
+        }
+        else if (dy == 1) // Top face
+        {
+            DirectionBool = SetBlockDirection(3, blockDirection);
+            quadVertices[0] = new Vector3(x, y + 1, z);
+            quadVertices[1] = new Vector3(x, y + 1, z + 1);
+            quadVertices[2] = new Vector3(x + 1, y + 1, z);
+            quadVertices[3] = new Vector3(x + 1, y + 1, z + 1);
+            inverted = true;
+        }
+        else if (dz == -1) // Back face
+        {
+            DirectionBool = SetBlockDirection(4, blockDirection);
+            quadVertices[0] = new Vector3(x, y, z);
+            quadVertices[1] = new Vector3(x + 1, y, z);
+            quadVertices[2] = new Vector3(x, y + 1, z);
+            quadVertices[3] = new Vector3(x + 1, y + 1, z);
+        }
+        else if (dz == 1) // Front face
+        {
+            DirectionBool = SetBlockDirection(5, blockDirection);
+            quadVertices[0] = new Vector3(x, y, z + 1);
+            quadVertices[1] = new Vector3(x + 1, y, z + 1);
+            quadVertices[2] = new Vector3(x, y + 1, z + 1);
+            quadVertices[3] = new Vector3(x + 1, y + 1, z + 1);
+            inverted = true;
+        }
+
+        if (inverted)
+        {
+            // Swap vertices to invert the quad
+            Vector3 temp = quadVertices[0];
+            quadVertices[0] = quadVertices[1];
+            quadVertices[1] = temp;
+
+            temp = quadVertices[2];
+            quadVertices[2] = quadVertices[3];
+            quadVertices[3] = temp;
+        }
+
+        return (quadVertices, DirectionBool);
+    }
+
+
+    private bool[] SetBlockDirection(int face, byte blockDirectionVal)
+    {
+        bool[] directionBool = new bool[6];
+
+        const byte DEFAULT = 0;
+        const byte NORTH = 1;
+        const byte EAST = 2;
+        const byte SOUTH = 3;
+        const byte WEST = 4;
+
+        // Set directions based on the block's orientation
+        if (blockDirectionVal == DEFAULT || blockDirectionVal == NORTH)
+        {
+            if (face == 0) directionBool[2] = true; // Left
+            if (face == 1) directionBool[3] = true; // Right
+            if (face == 2) directionBool[5] = true; // Bottom
+            if (face == 3) directionBool[4] = true; // Top
+            if (face == 4) directionBool[1] = true; // Back
+            if (face == 5) directionBool[0] = true; // Front
+        }
+        else if (blockDirectionVal == EAST)
+        {
+            if (face == 0) directionBool[1] = true; // Left
+            if (face == 1) directionBool[0] = true; // Right
+            if (face == 2) directionBool[5] = true; // Bottom
+            if (face == 3) directionBool[4] = true; // Top
+            if (face == 4) directionBool[3] = true; // Back
+            if (face == 5) directionBool[2] = true; // Front
+        }
+        else if (blockDirectionVal == SOUTH)
+        {
+            if (face == 0) directionBool[3] = true; // Left
+            if (face == 1) directionBool[2] = true; // Right
+            if (face == 2) directionBool[5] = true; // Bottom
+            if (face == 3) directionBool[4] = true; // Top
+            if (face == 4) directionBool[0] = true; // Back
+            if (face == 5) directionBool[1] = true; // Front
+        }
+        else if (blockDirectionVal == WEST)
+        {
+            if (face == 0) directionBool[0] = true; // Left
+            if (face == 1) directionBool[1] = true; // Right
+            if (face == 2) directionBool[5] = true; // Bottom
+            if (face == 3) directionBool[4] = true; // Top
+            if (face == 4) directionBool[2] = true; // Back
+            if (face == 5) directionBool[3] = true; // Front
+        }
+        return directionBool;
+    }
+
+
+
+    void UpdateMesh(Mesh mesh, (List<Vector3> vertices, List<int> triangles, List<Vector2> uvs) meshData, GameObject obj)
     {
         MeshCollider meshCollider = obj.GetComponent<MeshCollider>();
 
-
-        var verticesArray = vertices.ToArray();
-        var trianglesArray = triangles.ToArray();
-        var uvsArray = uvs.ToArray();
+        var verticesArray = meshData.vertices.ToArray();
+        var trianglesArray = meshData.triangles.ToArray();
+        var uvsArray = meshData.uvs.ToArray();
 
         mesh.Clear();
         mesh.vertices = verticesArray;
@@ -668,7 +661,7 @@ public class Chunk : MonoBehaviour
         mesh.uv = uvsArray;
         mesh.RecalculateNormals();
 
-        if (vertices.Count == 0 || triangles.Count == 0)
+        if (verticesArray.Length == 0 || trianglesArray.Length == 0)
         {
             if (meshCollider)
             {
@@ -682,9 +675,9 @@ public class Chunk : MonoBehaviour
             meshCollider = obj.AddComponent<MeshCollider>();
         }
         meshCollider.sharedMesh = mesh;
-        meshCollider.convex = true;
-        meshCollider.convex = false; // You only need to set convex once
+        meshCollider.convex = false; // Convex should be set to false unless necessary for your use case
     }
+
 
 
     private GameObject LightParent;
@@ -779,47 +772,54 @@ public class Chunk : MonoBehaviour
         return false;
     }
 
+    public string GetBlockKey (Dictionary<string, byte> dictionary, byte value)
+    {
+        foreach(KeyValuePair<string, byte> key in  dictionary)
+        {
+            if(key.Value == value)
+            {
+                return key.Key;
+            }
+        }
+        return "";
+    }
 
     private bool IsFaceVisible(int x, int y, int z, int dx, int dy, int dz)
     {
+        int neighborX = x + dx;
+        int neighborY = y + dy;
+        int neighborZ = z + dz;
 
-        if (x + dx >= 0 && x + dx < ChunkSize &&
-            y + dy >= 0 && y + dy < ChunkSize &&
-            z + dz >= 0 && z + dz < ChunkSize)
+
+        if (neighborX >= 0 && neighborX < ChunkSize &&
+            neighborY >= 0 && neighborY < ChunkSize &&
+            neighborZ >= 0 && neighborZ < ChunkSize)
         {
-            byte NeighbourBlockID = VoxelData[x + dx, y + dy, z + dz];
+            byte neighborBlockID = VoxelData[neighborX, neighborY, neighborZ];
+            byte currentBlockID = VoxelData[x, y, z];
+
+            bool isCurrentTransparent = ReturnType(currentBlockID, TransparentIDs);
+            bool isCurrentNoCollision = ReturnType(currentBlockID, NoCollisionIDs);
+            bool isCurrentNoCollisionTransparent = ReturnType(currentBlockID, NoCollisionTransparentIDs);
+
+            bool isNeighborTransparent = ReturnType(neighborBlockID, TransparentIDs);
+            bool isNeighborNoCollision = ReturnType(neighborBlockID, NoCollisionIDs);
+            bool isNeighborNoCollisionTransparent = ReturnType(neighborBlockID, NoCollisionTransparentIDs);
 
 
-            bool isTransparent = ReturnType(VoxelData[x, y, z], TransparentIDs);
-            bool isNoCollision = ReturnType(VoxelData[x, y, z], NoCollisionIDs);
-            bool isNoCollisionTransparent = ReturnType(VoxelData[x, y, z], NoCollisionTransparentIDs);
-
-
-            bool NeighborisTransparent = ReturnType(NeighbourBlockID, TransparentIDs);
-            bool NeighborisNoCollision = ReturnType(NeighbourBlockID, NoCollisionIDs);
-            bool NeighborisNoCollisionTransparent = ReturnType(NeighbourBlockID, NoCollisionTransparentIDs);
-
-
-
-            if (!isTransparent)
+            if (!isCurrentTransparent)
             {
-                if (NeighbourBlockID == BlockList["Air"] || NeighborisTransparent)
+                if (neighborBlockID == BlockList["Air"] || isNeighborTransparent)
                 {
                     return true;
                 }
             }
             else
             {
+                string KeyName = GetBlockKey(BlockList, neighborBlockID);
 
-                bool isNeighborTransparentBlockSameType = false;
-                if (NeighbourBlockID == VoxelData[x, y, z])
-                {
-                    isNeighborTransparentBlockSameType = true;
-                }
-
-
-
-                if ((!isNeighborTransparentBlockSameType && NeighborisTransparent) || NeighbourBlockID == BlockList["Air"])
+                bool isNeighborSameType = (neighborBlockID == currentBlockID && !KeyName.Contains("Leaves"));
+                if ((!isNeighborSameType && isNeighborTransparent) || neighborBlockID == BlockList["Air"])
                 {
                     return true;
                 }
@@ -827,55 +827,43 @@ public class Chunk : MonoBehaviour
         }
         else
         {
+            // Check neighboring chunk
             Chunk neighboringChunk = ChunkManager.Instance.GetNeighboringChunk(currentPos, dx, dy, dz);
             if (neighboringChunk != null)
             {
-                int neighborX = (x + dx + ChunkSize) % ChunkSize;
-                int neighborY = (y + dy + ChunkSize) % ChunkSize;
-                int neighborZ = (z + dz + ChunkSize) % ChunkSize;
+                int wrappedX = (neighborX + ChunkSize) % ChunkSize;
+                int wrappedY = (neighborY + ChunkSize) % ChunkSize;
+                int wrappedZ = (neighborZ + ChunkSize) % ChunkSize;
 
-                byte[,,] VoxelDataNeighbor = neighboringChunk.GetData();
-                if (VoxelDataNeighbor.Length > 0)
+                byte[,,] neighborVoxelData = neighboringChunk.GetData();
+                byte neighborBlockID = neighborVoxelData[wrappedX, wrappedY, wrappedZ];
+                byte currentBlockID = VoxelData[x, y, z];
+
+                // Cache results of ReturnType
+                bool isCurrentTransparent = ReturnType(currentBlockID, TransparentIDs);
+                bool isCurrentNoCollision = ReturnType(currentBlockID, NoCollisionIDs);
+                bool isCurrentNoCollisionTransparent = ReturnType(currentBlockID, NoCollisionTransparentIDs);
+
+                bool isNeighborTransparent = ReturnType(neighborBlockID, TransparentIDs);
+                bool isNeighborNoCollision = ReturnType(neighborBlockID, NoCollisionIDs);
+                bool isNeighborNoCollisionTransparent = ReturnType(neighborBlockID, NoCollisionTransparentIDs);
+
+                // Check visibility
+                if (!isCurrentTransparent)
                 {
-                    byte NeighbourBlockID = VoxelDataNeighbor[neighborX, neighborY, neighborZ];
-
-                    bool isTransparent = ReturnType(VoxelData[x, y, z], TransparentIDs);
-                    bool isNoCollision = ReturnType(VoxelData[x, y, z], NoCollisionIDs);
-                    bool isNoCollisionTransparent = ReturnType(VoxelData[x, y, z], NoCollisionTransparentIDs);
-
-
-                    bool NeighborisTransparent = ReturnType(NeighbourBlockID, TransparentIDs);
-                    bool NeighborisNoCollision = ReturnType(NeighbourBlockID, NoCollisionIDs);
-                    bool NeighborisNoCollisionTransparent = ReturnType(NeighbourBlockID, NoCollisionTransparentIDs);
-
-
-                    if (!isTransparent)
+                    if (neighborBlockID == BlockList["Air"] || isNeighborTransparent)
                     {
-                        if (NeighbourBlockID == BlockList["Air"] || NeighborisTransparent)
-                        {
-                            return true;
-                        }
-                    }
-                    else
-                    {
-
-                        bool isNeighborTransparentBlockSameType = false;
-                        if (NeighbourBlockID == VoxelData[x, y, z])
-                        {
-                            isNeighborTransparentBlockSameType = true;
-                        }
-
-
-
-                        if ((!isNeighborTransparentBlockSameType && NeighborisTransparent) || NeighbourBlockID == BlockList["Air"])
-                        {
-                            return true;
-                        }
+                        return true;
                     }
                 }
                 else
                 {
-                    return false;
+                    string KeyName = GetBlockKey(BlockList, neighborBlockID);
+                    bool isNeighborSameType = (neighborBlockID == currentBlockID && !KeyName.Contains("Leaves"));
+                    if ((!isNeighborSameType && isNeighborTransparent) || neighborBlockID == BlockList["Air"])
+                    {
+                        return true;
+                    }
                 }
             }
         }
@@ -972,74 +960,5 @@ public class Chunk : MonoBehaviour
         }
     }
 
-
-
-    private void AddQuad(List<Vector3> vertices, List<int> triangles, List<Vector2> uvs, Vector3 bottomLeft, Vector3 bottomRight, Vector3 topLeft, Vector3 topRight, int blockId, bool inverted, bool[] direction)
-    {
-        Vector3 center = Vector3.zero;
-        int vertIndex = vertices.Count;
-
-        int textureID = 0;
-
-        for (int i = 0; i < BlockFaces[(byte)(blockId)].Length; i++)
-        {
-            if (direction[i] == true)
-            {
-                int newTexID = BlockFaces[(byte)(blockId)][i];
-                textureID = newTexID == 0 ? blockId - 1 : newTexID;
-                break;
-            }
-        }
-
-
-
-        // Add vertices
-        vertices.Add(bottomLeft);
-        vertices.Add(bottomRight);
-        vertices.Add(topLeft);
-        vertices.Add(topRight);
-
-        // Add UVs
-        float atlasSize = TextureSize;
-        float blockSize = BlockSize;
-        float blocksPerRow = atlasSize / blockSize;
-        float row = Mathf.Floor(textureID / blocksPerRow);
-        float col = textureID % blocksPerRow;
-        float blockX = col * (blockSize / atlasSize);
-        float blockY = row * (blockSize / atlasSize);
-        float uvSize = 1.0f / blocksPerRow;
-
-        Vector2[] quadUVs;
-        if (!inverted)
-        {
-            quadUVs = new Vector2[]
-            {
-            new Vector2(blockX, blockY),
-            new Vector2(blockX + uvSize, blockY),
-            new Vector2(blockX, blockY + uvSize),
-            new Vector2(blockX + uvSize, blockY + uvSize)
-            };
-        }
-        else
-        {
-            quadUVs = new Vector2[]
-            {
-            new Vector2(blockX + uvSize, blockY),
-            new Vector2(blockX, blockY),
-            new Vector2(blockX + uvSize, blockY + uvSize),
-            new Vector2(blockX, blockY + uvSize)
-            };
-        }
-
-        uvs.AddRange(quadUVs);
-
-        // Add triangles
-        triangles.Add(vertIndex);
-        triangles.Add(vertIndex + 2);
-        triangles.Add(vertIndex + 1);
-        triangles.Add(vertIndex + 2);
-        triangles.Add(vertIndex + 3);
-        triangles.Add(vertIndex + 1);
-    }
 }
 

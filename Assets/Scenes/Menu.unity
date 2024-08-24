@@ -26,7 +26,7 @@ RenderSettings:
   m_AmbientIntensity: 1
   m_AmbientMode: 0
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
-  m_SkyboxMaterial: {fileID: 2100000, guid: 62488b14bb698544c8efdef4d2e629e0, type: 2}
+  m_SkyboxMaterial: {fileID: 2100000, guid: 9b085bb2e9811e149ae05d16c4fa2328, type: 2}
   m_HaloStrength: 0.5
   m_FlareStrength: 1
   m_FlareFadeSpeed: 3
@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.08749567, g: 0.18014082, b: 0.15092298, a: 1}
+  m_IndirectSpecularColor: {r: 0.18028653, g: 0.22571698, b: 0.30692574, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -522,52 +522,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 310032982}
   m_CullTransparentMesh: 1
---- !u!1 &311478782
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 311478784}
-  - component: {fileID: 311478783}
-  m_Layer: 0
-  m_Name: GameObject
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &311478783
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 311478782}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3f857f53edcee5c4c8a6502d47f654a1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  SpinSpeed: 2.5
-  SpinMaterial: {fileID: 2100000, guid: 62488b14bb698544c8efdef4d2e629e0, type: 2}
---- !u!4 &311478784
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 311478782}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &323193507
 GameObject:
   m_ObjectHideFlags: 0
@@ -3395,7 +3349,7 @@ MonoBehaviour:
   m_ScaleFactor: 0.5
   m_ReferenceResolution: {x: 1920, y: 1080}
   m_ScreenMatchMode: 0
-  m_MatchWidthOrHeight: 0
+  m_MatchWidthOrHeight: 0.5
   m_PhysicalUnit: 1
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
@@ -6969,10 +6923,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1056785621}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 4048, y: 4048}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2045623081
 MonoBehaviour:
@@ -6986,8 +6940,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1344c3c82d62a2a41a3576d8abb8e3ea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 0.78431374}
+  m_Material: {fileID: 2100000, guid: 74e75c8067df8e84da6fd4e4f4f41541, type: 2}
+  m_Color: {r: 0.4339623, g: 0.4339623, b: 0.4339623, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -7234,6 +7188,9 @@ MonoBehaviour:
   - material: {fileID: 2100000, guid: 443aadf76cc93294ca805778a05429a4, type: 2}
     textureNameMat: _MainTex
     textureName: atlas.png
+  - material: {fileID: 2100000, guid: 74e75c8067df8e84da6fd4e4f4f41541, type: 2}
+    textureNameMat: _MainTex
+    textureName: background.png
 --- !u!4 &2059220293
 Transform:
   m_ObjectHideFlags: 0
@@ -7568,7 +7525,6 @@ SceneRoots:
   - {fileID: 392027237}
   - {fileID: 1039120683}
   - {fileID: 984672725}
-  - {fileID: 311478784}
   - {fileID: 1056785621}
   - {fileID: 856284919}
   - {fileID: 1217461223}

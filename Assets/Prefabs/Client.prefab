@@ -1481,6 +1481,10 @@ MonoBehaviour:
   Chatting: 0
   CamWaterFX: {fileID: 8651424122864544741}
   EarthMap: {fileID: 4703392524293229935}
+  DebugCameras:
+  - {fileID: 7031269575910039983}
+  - {fileID: 4648611450726935143}
+  - {fileID: 6288243384197711161}
   GameTime:
     m_InternalValue: 45
   Username:
@@ -6529,36 +6533,108 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Oak Planks
     Value: 6
-    FrontFace: 5
-    BackFace: 5
-    LeftFace: 5
-    RightFace: 5
-    TopFace: 5
-    BottomFace: 5
+    FrontFace: 221
+    BackFace: 221
+    LeftFace: 221
+    RightFace: 221
+    TopFace: 221
+    BottomFace: 221
     Transparent: 0
     NoCollision: 0
     NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Oak Log
     Value: 7
-    FrontFace: 6
-    BackFace: 6
-    LeftFace: 6
-    RightFace: 6
-    TopFace: 253
-    BottomFace: 253
+    FrontFace: 222
+    BackFace: 222
+    LeftFace: 222
+    RightFace: 222
+    TopFace: 223
+    BottomFace: 223
     Transparent: 0
     NoCollision: 0
     NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
-  - Name: Leaves
+  - Name: Oak Leaves
     Value: 8
-    FrontFace: 7
-    BackFace: 7
-    LeftFace: 7
-    RightFace: 7
-    TopFace: 7
-    BottomFace: 7
+    FrontFace: 220
+    BackFace: 220
+    LeftFace: 220
+    RightFace: 220
+    TopFace: 220
+    BottomFace: 220
+    Transparent: 1
+    NoCollision: 0
+    NoPlayerCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Birch Planks
+    Value: 45
+    FrontFace: 205
+    BackFace: 205
+    LeftFace: 205
+    RightFace: 205
+    TopFace: 205
+    BottomFace: 205
+    Transparent: 0
+    NoCollision: 0
+    NoPlayerCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Birch Log
+    Value: 45
+    FrontFace: 206
+    BackFace: 206
+    LeftFace: 206
+    RightFace: 206
+    TopFace: 207
+    BottomFace: 207
+    Transparent: 0
+    NoCollision: 0
+    NoPlayerCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Birch Leaves
+    Value: 45
+    FrontFace: 204
+    BackFace: 204
+    LeftFace: 204
+    RightFace: 204
+    TopFace: 204
+    BottomFace: 204
+    Transparent: 1
+    NoCollision: 0
+    NoPlayerCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Spruce Planks
+    Value: 45
+    FrontFace: 189
+    BackFace: 189
+    LeftFace: 189
+    RightFace: 189
+    TopFace: 189
+    BottomFace: 189
+    Transparent: 0
+    NoCollision: 0
+    NoPlayerCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Spruce Log
+    Value: 45
+    FrontFace: 190
+    BackFace: 190
+    LeftFace: 190
+    RightFace: 190
+    TopFace: 191
+    BottomFace: 191
+    Transparent: 0
+    NoCollision: 0
+    NoPlayerCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Spruce Leaves
+    Value: 45
+    FrontFace: 188
+    BackFace: 188
+    LeftFace: 188
+    RightFace: 188
+    TopFace: 188
+    BottomFace: 188
     Transparent: 1
     NoCollision: 0
     NoPlayerCollision: 0
@@ -7049,8 +7125,8 @@ MonoBehaviour:
     BackFace: 245
     LeftFace: 245
     RightFace: 245
-    TopFace: 5
-    BottomFace: 5
+    TopFace: 221
+    BottomFace: 221
     Transparent: 0
     NoCollision: 0
     NoPlayerCollision: 0
@@ -7106,7 +7182,7 @@ MonoBehaviour:
   WorldType: 
   ChunkBorderPrefab: {fileID: 6104295362550119401, guid: b2a1684a706b6a845ade531b06670eda,
     type: 3}
-  ChunkBorders: 0
+  ChunkBorders: 1
   renderDistance: 8
   ChunkSize: 16
   TextureSize: 256

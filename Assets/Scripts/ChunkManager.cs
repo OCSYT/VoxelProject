@@ -97,15 +97,15 @@ public class ChunkManager : NetworkBehaviour
     public class ChunkData
     {
         public SerializableVector3Int Position;
-        public List<byte> Data;
+        public List<string> Data;
         public List<byte> DataDir;
 
         public ChunkData() { }
-        public ChunkData(Vector3Int position, byte[,,] data, byte[,,] dataDir)
+        public ChunkData(Vector3Int position, string[,,] data, byte[,,] dataDir)
         {
             Position = new SerializableVector3Int(position);
 
-            Data = new List<byte>();
+            Data = new List<string>();
             DataDir = new List<byte>();
             int sizeX = data.GetLength(0);
             int sizeY = data.GetLength(1);
@@ -133,10 +133,11 @@ public class ChunkManager : NetworkBehaviour
         public float GameTime;
         public List<ChunkData> Chunks;
         public List<PlayerData> Players;
+        private Dictionary<string, byte> BlockList;
 
         public SaveData() { }
 
-        public SaveData(int seed, float time, string worldtype, Vector3Int _SpawnPosition, Dictionary<Vector3Int, byte[,,]> chunkCache, Dictionary<Vector3Int, byte[,,]> chunkCacheDir, List<PlayerData> players)
+        public SaveData(int seed, float time, string worldtype, Vector3Int _SpawnPosition, Dictionary<Vector3Int, string[,,]> chunkCache, Dictionary<Vector3Int, byte[,,]> chunkCacheDir, List<PlayerData> players)
         {
             SpawnPosition = new SerializableVector3Int(_SpawnPosition);
             Seed = seed;
@@ -195,7 +196,10 @@ public class ChunkManager : NetworkBehaviour
         // Create SaveData object
         SaveData saveData = new SaveData(seed, GameTime, WorldType, Vector3Int.FloorToInt(SpawnPosition), chunkCache, chunkCacheDirection, players);
 
-
+/*        // Serialize the SaveData object to JSON for debugging
+        string saveDataJson = JsonConvert.SerializeObject(saveData, Formatting.Indented);
+        string jsonFilePath = Path.ChangeExtension(filePath, ".json");
+        File.WriteAllText(jsonFilePath, saveDataJson);*/
 
         // Serialize the SaveData object to binary
         byte[] saveDataBytes;
@@ -293,7 +297,7 @@ public class ChunkManager : NetworkBehaviour
         // Load chunk data
         chunkCache = saveData.Chunks.ToDictionary(
             chunk => chunk.Position.ToVector3Int(),
-            chunk => ConvertTo3DArray(chunk.Data, ChunkSize, ChunkSize, ChunkSize)
+            chunk => ConvertTo3DArrayString(chunk.Data, ChunkSize, ChunkSize, ChunkSize)
         );
         chunkCacheDirection = saveData.Chunks.ToDictionary(
             chunk => chunk.Position.ToVector3Int(),
@@ -371,7 +375,7 @@ public class ChunkManager : NetworkBehaviour
     public Dictionary<Vector3Int, GameObject> activeChunksObj = new Dictionary<Vector3Int, GameObject>();
     private Vector3 previousTargetPosition;
     private float previousTargetRotation;
-    private Dictionary<Vector3Int, byte[,,]> chunkCache = new Dictionary<Vector3Int, byte[,,]>();
+    private Dictionary<Vector3Int, string[,,]> chunkCache = new Dictionary<Vector3Int, string[,,]>();
     private Dictionary<Vector3Int, byte[,,]> chunkCacheDirection = new Dictionary<Vector3Int, byte[,,]>();
     public Dictionary<string, byte> BlockList = new Dictionary<string, byte>();
     public Dictionary<byte, Color> BlockListLight = new Dictionary<byte, Color>();
@@ -521,6 +525,30 @@ public class ChunkManager : NetworkBehaviour
         return result;
     }
 
+    private string[,,] ConvertTo3DArrayString(List<string> data, int sizeX, int sizeY, int sizeZ)
+    {
+        string[,,] result = new string[sizeX, sizeY, sizeZ];
+        try
+        {
+            int index = 0;
+            for (int x = 0; x < sizeX; x++)
+            {
+                for (int y = 0; y < sizeY; y++)
+                {
+                    for (int z = 0; z < sizeZ; z++)
+                    {
+                        result[x, y, z] = data[index++];
+                    }
+                }
+            }
+        }
+        catch
+        {
+
+        }
+        return result;
+    }
+
 
 
     bool cancelledGeneration = false;
@@ -580,7 +608,7 @@ public class ChunkManager : NetworkBehaviour
 
             foreach (Vector3Int chunkPosition in sortedChunkPositions)
             {
-                await Task.Delay(Mathf.RoundToInt(CPUClock/2));
+                await Task.Delay(Mathf.RoundToInt(CPUClock/3));
                 if (cancelledGeneration)
                 {
                     cancelledGeneration = false;
@@ -675,8 +703,23 @@ public class ChunkManager : NetworkBehaviour
         }
         else
         {
-            newData = chunkCache[chunkPosition];
+            newData = new byte[ChunkSize, ChunkSize, ChunkSize];
+            string[,,] Blocks = chunkCache[chunkPosition];
+            for(int x = 0; x < ChunkSize; x++)
+            {
+                for(int y = 0; y < ChunkSize; y++)
+                {
+                    for(int z = 0; z < ChunkSize; z++)
+                    {
+                        if (BlockList.ContainsKey(Blocks[x, y, z]))
+                        {
+                            newData[x, y, z] = BlockList[Blocks[x, y, z]];
+                        }
+                    }
+                }
+            }
         }
+
         if (!chunkCacheDirection.ContainsKey(chunkPosition))
         {
             newDataDir = new byte[ChunkSize, ChunkSize, ChunkSize];
@@ -807,7 +850,7 @@ public class ChunkManager : NetworkBehaviour
             StartCoroutine(GetEarthSpawn());
             await Task.Run(async () =>
             {
-                while(FoundEarthSpawn == false)
+                while (FoundEarthSpawn == false)
                 {
                     await Task.Delay(1);
                 }
@@ -815,30 +858,24 @@ public class ChunkManager : NetworkBehaviour
             return new Vector3(0, EarthSpawn, EarthSpawnX);
         }
 
-
         await Task.Run(async () =>
         {
-            for (int x = 0; x < Mathf.Infinity; x++) 
+            for (int x = 0; x < Mathf.Infinity; x++)
             {
-                Vector3 voxelPosition2D = new Vector3(x, 0, 0);
+                Vector3 voxelPosition2D = new Vector3(0, 0, x);
                 float _Continentalness = Continentalness(voxelPosition2D, scale, 4, 0.5f, 2);
                 float _Errosion = Errosion(voxelPosition2D, scale / 5);
 
-                for (int y = 0; y < ChunkSize; y++)
+                float perlinRaw = (_Continentalness * height) - _Errosion * height;
+                float perlinValue = perlinRaw;
+                int perlinRounded = (Mathf.RoundToInt(perlinValue));
+
+                if (perlinRounded > waterLevel)
                 {
-
-                    float perlinRaw = (_Continentalness * height) - _Errosion * height;
-                    float perlinValue = perlinRaw;
-                    int perlinRounded = (Mathf.RoundToInt(perlinValue));
-
-                    if (y == perlinRounded && y > waterLevel)
-                    {
-                        FinalPos = new Vector3(x, perlinRounded + 2, 0);
-                        return; 
-                    }
+                    FinalPos = new Vector3(0, perlinRounded + 2, x);
+                    return;
                 }
-
-                await Task.Delay(1); 
+                await Task.Delay(1);
             }
         });
 
@@ -1015,7 +1052,7 @@ public class ChunkManager : NetworkBehaviour
                     else
                     {
                         float _Continentalness = Continentalness(voxelPosition2D, scale, 4, 0.5f, 2);
-                        float _Humidity = Humidity(voxelPosition2D, scale * 2);
+                        float _Humidity = Humidity(-voxelPosition2D, scale * 2);
                         float _Temp = 1 - Humidity(voxelPosition2D, scale * 2);
                         float _Errosion = Errosion(voxelPosition2D, scale / 5);
                         float perlinRaw = (_Continentalness * height) - _Errosion * height;
@@ -1164,63 +1201,164 @@ public class ChunkManager : NetworkBehaviour
 
                         if (VoxelData[x, y, z] == BlockList["Grass"] || VoxelData[x, y, z] == BlockList["Snow Grass"])
                         {
-                            if (y + 10 < ChunkSize && x + 2 < ChunkSize && z + 2 < ChunkSize
-                            && x - 2 > 0 && z - 2 > 0
-                            && random.NextDouble() > .975f && !HasWoodNeighbor(VoxelData, x, y, z, 3))
+                            if (VoxelData[x, y, z] == BlockList["Grass"])
                             {
-                                // Generate the Oak Log
-                                for (int i = y + 1; i < y + 4; i++)
+
+                                bool IsOak = random.NextDouble() > 0.25;
+
+                                if (IsOak)
                                 {
-                                    if (VoxelData[x, i, z] == 0)
+                                    int treeHeight = 7; // Height of the tree (trunk + leaves)
+                                    int trunkHeight = 3; // Height of the trunk
+                                    int treeWidth = 2; // Radius of the leaves (half of the tree width)
+
+                                    // Ensure there is enough space for the tree
+                                    if (y + treeHeight < ChunkSize &&
+                                        x + treeWidth < ChunkSize && z + treeWidth < ChunkSize &&
+                                        x - treeWidth > 0 && z - treeWidth > 0 &&
+                                        random.NextDouble() > .975f)
                                     {
-                                        VoxelData[x, i, z] = BlockList["Oak Log"];
+                                        // Generate the Oak Log (trunk)
+                                        for (int i = y + 1; i < y + 1 + trunkHeight; i++)
+                                        {
+                                            if (VoxelData[x, i, z] == 0)
+                                            {
+                                                VoxelData[x, i, z] = BlockList["Oak Log"];
+                                            }
+                                        }
+
+                                        // Generate the Leaves (cone-shaped)
+                                        for (int offsetY = y + trunkHeight + 1; offsetY < y + treeHeight; offsetY++)
+                                        {
+                                            int currentRadius = Mathf.Clamp(treeWidth - (offsetY - (y + trunkHeight + 1)), 1, ChunkSize);
+                                            for (int offsetX = -currentRadius; offsetX <= currentRadius; offsetX++)
+                                            {
+                                                for (int offsetZ = -currentRadius; offsetZ <= currentRadius; offsetZ++)
+                                                {
+                                                    // Skip corners and edges based on the current radius
+                                                    bool isCornerOrEdge =
+                                                                    (Math.Abs(offsetX) == currentRadius && Math.Abs(offsetZ) == currentRadius);
+
+                                                    if (!isCornerOrEdge && VoxelData[x + offsetX, offsetY, z + offsetZ] == 0)
+                                                    {
+                                                        VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Oak Leaves"];
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
-
-                                // Generate the Leaves
-                                for (int offsetY = y + 4; offsetY < y + 8; offsetY++)
+                                else
                                 {
-                                    for (int offsetX = -2; offsetX <= 2; offsetX++)
-                                    {
-                                        for (int offsetZ = -2; offsetZ <= 2; offsetZ++)
-                                        {
-                                            bool isCornerOrEdge =
-                                                            (Math.Abs(offsetX) == 2 && Math.Abs(offsetZ) == 2) ||  // x-z corners
-                                                            (Math.Abs(offsetY) == y + 4 && Math.Abs(offsetX) == 2) ||  // x-y edges (bottom and top)
-                                                            (Math.Abs(offsetY) == y + 4 && Math.Abs(offsetZ) == 2) ||
-                                                             (Math.Abs(offsetY) == y + 7 && Math.Abs(offsetX) == 2) ||  // x-y edges (bottom and top)
-                                                            (Math.Abs(offsetY) == y + 7 && Math.Abs(offsetZ) == 2);  // y-z edges (bottom and top);  // y-z edges (bottom and top)
+                                    int treeHeight = 8; // Height of the tree (trunk + leaves)
+                                    int trunkHeight = 4; // Height of the trunk
+                                    int treeWidth = 2; // Radius of the leaves (half of the tree width)
 
-                                            if (!isCornerOrEdge && VoxelData[x + offsetX, offsetY, z + offsetZ] == 0)
+                                    // Ensure there is enough space for the tree
+                                    if (y + treeHeight < ChunkSize &&
+                                        x + treeWidth < ChunkSize && z + treeWidth < ChunkSize &&
+                                        x - treeWidth > 0 && z - treeWidth > 0 &&
+                                        random.NextDouble() > .975f)
+                                    {
+                                        // Generate the Oak Log (trunk)
+                                        for (int i = y + 1; i < y + 1 + trunkHeight; i++)
+                                        {
+                                            if (VoxelData[x, i, z] == 0)
                                             {
-                                                VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Leaves"];
+                                                VoxelData[x, i, z] = BlockList["Birch Log"];
+                                            }
+                                        }
+
+                                        // Generate the Leaves (cone-shaped)
+                                        for (int offsetY = y + trunkHeight + 1; offsetY < y + treeHeight; offsetY++)
+                                        {
+                                            int currentRadius = Mathf.Clamp(treeWidth - (offsetY - (y + trunkHeight + 1)), 1, ChunkSize);
+                                            for (int offsetX = -currentRadius; offsetX <= currentRadius; offsetX++)
+                                            {
+                                                for (int offsetZ = -currentRadius; offsetZ <= currentRadius; offsetZ++)
+                                                {
+                                                    // Skip corners and edges based on the current radius
+                                                    bool isCornerOrEdge =
+                                                                    (Math.Abs(offsetX) == currentRadius && Math.Abs(offsetZ) == currentRadius);
+
+                                                    if (!isCornerOrEdge && VoxelData[x + offsetX, offsetY, z + offsetZ] == 0)
+                                                    {
+                                                        VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Birch Leaves"];
+                                                    }
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
-                            else
+                            else if (VoxelData[x, y, z] == BlockList["Snow Grass"])
                             {
-                                if (y + 1 < ChunkSize && random.NextDouble() > 0.95f)
-                                {
-                                    int grassHeight = 1;
+                                int treeHeight = 10; // Height of the tree (trunk + leaves)
+                                int trunkHeight = 4; // Height of the trunk
+                                int maxTreeWidth = 3; // Maximum radius of the leaves (half of the tree width)
 
-                                    bool canPlaceGrass = true;
-                                    if (y + grassHeight >= ChunkSize || VoxelData[x, y + grassHeight, z] != 0)
+                                // Ensure there is enough space for the tree
+                                if (y + treeHeight < ChunkSize &&
+                                    x + maxTreeWidth < ChunkSize && z + maxTreeWidth < ChunkSize &&
+                                    x - maxTreeWidth > 0 && z - maxTreeWidth > 0 &&
+                                    random.NextDouble() > .975f)
+                                {
+                                    // Generate the Oak Log (trunk)
+                                    for (int i = y + 1; i < y + 1 + trunkHeight; i++)
                                     {
-                                        canPlaceGrass = false;
+                                        if (VoxelData[x, i, z] == 0)
+                                        {
+                                            VoxelData[x, i, z] = BlockList["Spruce Log"];
+                                        }
                                     }
 
-                                    if (canPlaceGrass)
+                                    // Generate the Leaves (cone-shaped for pine tree)
+                                    int leafStartY = y + trunkHeight + 1;
+                                    int leafEndY = y + treeHeight;
+                                    for (int offsetY = leafStartY; offsetY < leafEndY; offsetY++)
                                     {
-                                        if (random.NextDouble() > 0.95f)
+                                        int currentRadius = Mathf.Clamp(maxTreeWidth - (offsetY - leafStartY) / 2, 1, maxTreeWidth);
+                                        for (int offsetX = -currentRadius; offsetX <= currentRadius; offsetX++)
                                         {
-                                            VoxelData[x, y + grassHeight, z] = BlockList["Roses"];
+                                            for (int offsetZ = -currentRadius; offsetZ <= currentRadius; offsetZ++)
+                                            {
+                                                // Skip corners and edges based on the current radius
+                                                bool isCornerOrEdge = (Math.Abs(offsetX) == currentRadius && Math.Abs(offsetZ) == currentRadius);
+
+                                                if (!isCornerOrEdge && VoxelData[x + offsetX, offsetY, z + offsetZ] == 0)
+                                                {
+                                                    VoxelData[x + offsetX, offsetY, z + offsetZ] = BlockList["Spruce Leaves"];
+                                                }
+                                            }
                                         }
-                                        else
-                                        {
-                                            VoxelData[x, y + grassHeight, z] = BlockList["Tall Grass"];
-                                        }
+                                    }
+
+                                    // Add the top leaf block to create the final point
+                                    if (VoxelData[x, leafEndY, z] == 0)
+                                    {
+                                        VoxelData[x, leafEndY, z] = BlockList["Spruce Leaves"];
+                                    }
+                                }
+                            }
+                            if (y + 1 < ChunkSize && random.NextDouble() > 0.95f)
+                            {
+                                int grassHeight = 1;
+
+                                bool canPlaceGrass = true;
+                                if (y + grassHeight >= ChunkSize || VoxelData[x, y + grassHeight, z] != 0)
+                                {
+                                    canPlaceGrass = false;
+                                }
+
+                                if (canPlaceGrass)
+                                {
+                                    if (random.NextDouble() > 0.95f)
+                                    {
+                                        VoxelData[x, y + grassHeight, z] = BlockList["Roses"];
+                                    }
+                                    else
+                                    {
+                                        VoxelData[x, y + grassHeight, z] = BlockList["Tall Grass"];
                                     }
                                 }
                             }
@@ -1259,42 +1397,6 @@ public class ChunkManager : NetworkBehaviour
     }
 
 
-
-
-
-
-    bool HasWoodNeighbor(byte[,,] voxelData, int x, int y, int z, int radius)
-    {
-        // Check neighboring blocks within a 3x3x3 cube
-        for (int offsetX = -radius; offsetX <= radius; offsetX++)
-        {
-            for (int offsetY = -radius; offsetY <= radius; offsetY++)
-            {
-                for (int offsetZ = -radius; offsetZ <= radius; offsetZ++)
-                {
-                    int neighborX = x + offsetX;
-                    int neighborY = y + offsetY;
-                    int neighborZ = z + offsetZ;
-
-                    // Ensure neighbor is within bounds
-                    if (neighborX >= 0 && neighborX < ChunkSize &&
-                        neighborY >= 0 && neighborY < ChunkSize &&
-                        neighborZ >= 0 && neighborZ < ChunkSize)
-                    {
-                        // Check if the neighbor is a wood block
-                        if (voxelData[neighborX, neighborY, neighborZ] == 7) // Assuming 7 is the ID for wood blocks
-                        {
-                            return true; // Found a wood neighbor
-                        }
-                    }
-                }
-            }
-        }
-        return false; // No wood neighbors found
-    }
-
-
-
     public float Perlin3D(float x, float y, float z, float scale)
     {
         float XY = Mathf.PerlinNoise(x, y);
@@ -1312,6 +1414,18 @@ public class ChunkManager : NetworkBehaviour
 
 
     private Dictionary<Vector3Int, List<(Vector3Int, byte, byte)>> voxelDataForNonExistentChunks = new Dictionary<Vector3Int, List<(Vector3Int, byte, byte)>>();
+
+    public string GetBlockKey(Dictionary<string, byte> dictionary, byte value)
+    {
+        foreach (KeyValuePair<string, byte> key in dictionary)
+        {
+            if (key.Value == value)
+            {
+                return key.Key;
+            }
+        }
+        return "";
+    }
 
     public void SetVoxelAtWorldPosition(Vector3 worldPosition, Vector3 worldNormal, byte voxelValue, bool regenerate, bool useCache)
     {
@@ -1383,7 +1497,21 @@ public class ChunkManager : NetworkBehaviour
             if (useCache)
             {
                 chunkCacheDirection[chunkPosition] = chunk.GetDirectionData();
-                chunkCache[chunkPosition] = chunk.GetData();
+                byte[,,] _ChunkData = chunk.GetData();
+                string[,,] CacheData = new string[ChunkSize, ChunkSize, ChunkSize];
+                for (int x = 0; x < ChunkSize; x++)
+                {
+                    for(int y = 0; y < ChunkSize; y++)
+                    {
+                        for(int z = 0; z < ChunkSize; z++)
+                        {
+                            CacheData[x, y, z] = GetBlockKey(BlockList, _ChunkData[x, y, z]);
+                        }
+                    }
+                }
+
+
+                chunkCache[chunkPosition] = CacheData;
             }
         }
         else

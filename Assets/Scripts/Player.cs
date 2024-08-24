@@ -88,7 +88,8 @@ public class Player : NetworkBehaviour
     private bool CamInWater = false;
     public GameObject CamWaterFX;
     public GameObject EarthMap;
-
+    private bool chunkborders;
+    public Camera[] DebugCameras;
     [HideInInspector]
     public NetworkVariable<float> GameTime = 
         new NetworkVariable<float>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -689,9 +690,10 @@ public class Player : NetworkBehaviour
 
                 if (ChatInput.text == "/help")
                 {
-                    SendChatMessageLocal("<color=#00FFFF>/spawn, /tp {Username} | {x} {y} {z}, /setSpawnPosition, /time set {Value}</color>");
+                    SendChatMessageLocal("<color=#00FFFF>/spawn, /tp {Username} | {x} {y} {z}, " +
+                        "/setSpawnPosition, /time set {Value}, /chunkborders </color>");
                 }
-                else if(ChatInput.text == "/spawn")
+                else if (ChatInput.text == "/spawn")
                 {
                     Teleport(chunkManager.SpawnPosition, 0, true);
                     SendChatMessageLocal("<color=#00FFFF>Teleported</color>");
@@ -772,8 +774,24 @@ public class Player : NetworkBehaviour
                         SendChatMessageLocal("<color=red>Invalid time value entered</color>");
                     }
                 }
+                else if (ChatInput.text == "/chunkborders")
+                {
+                    chunkborders = !chunkborders;
+                    SendChatMessageLocal("<color=#00FFFF>Set chunk borders to " + chunkborders + "</color>");
 
+                    foreach (Camera cam in DebugCameras)
+                    {
+                        if (chunkborders)
+                        {
+                            cam.cullingMask |= (1 << 11);
+                        }
+                        else
+                        {
+                            cam.cullingMask &= ~(1 << 11);
+                        }
+                    }
 
+                }
 
                 else if (ChatInput.text.StartsWith("/"))
                 {
@@ -789,7 +807,7 @@ public class Player : NetworkBehaviour
                     }
                     else
                     {
-                        SendChatMessageServerRPC(Username.Value.ToString() +": "+ ChatInput.text);
+                        SendChatMessageServerRPC(Username.Value.ToString() + ": " + ChatInput.text);
                     }
                 }
                 ChatInput.text = "";

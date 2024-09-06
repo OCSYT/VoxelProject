@@ -335,19 +335,34 @@ public class BlockPlace : NetworkBehaviour
         }
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    public void PlaceBlockServerRPC(Vector3 Target, Vector3 Direction, byte BlockID, bool Host, bool Remove, ulong owner)
+    [ServerRpc]
+    void PlaceBlockServerRPC(Vector3 position, Vector3 normal, byte blockId, bool buffer, bool regenerate, ulong id)
     {
-        if (!Remove)
-        {
-            ChunkManager.Instance.SetVoxelAtWorldPosition(Target, Direction, BlockID, Host, Remove);
-        }
-        else
-        {
-            ChunkManager.Instance.SetVoxelAtWorldPosition(Target, Vector3.zero, 0, Host, Remove);
-        }
-        BufferedBlockEvents.Add((Target, Direction, BlockID));
+        PlaceBlockClientRPC(position, normal, blockId, buffer, regenerate, id);
     }
+    [ClientRpc]
+    void PlaceBlockClientRPC(Vector3 position, Vector3 normal, byte blockId, bool buffer, bool regenerate, ulong id)
+    {
+        if (NetworkManager.LocalClientId != id)
+        {
+            ChunkManager.Instance.SetVoxelAtWorldPosition(position, normal, blockId, regenerate, true);
+            if (blockId != 0)
+            {
+                GameObject SFX = GameObject.Instantiate(PlaceSFX, position, Quaternion.identity);
+                Destroy(SFX, 5f);
+            }
+            else
+            {
+                GameObject SFX = GameObject.Instantiate(BreakSFX, position, Quaternion.identity);
+                Destroy(SFX, 5f);
+            }
+        }
+        if (buffer && IsHost)
+        {
+            BufferedBlockEvents.Add((position, normal, blockId));
+        }
+    }
+
 
     public class Block
     {
@@ -369,12 +384,27 @@ public class BlockPlace : NetworkBehaviour
         ChunkManager.Instance.ClearChunks();
         BufferedBlockEvents.Clear();
     }
-    public bool PlayerInWay(Vector3 BlockPosition)
+    bool PlayerInWay(Vector3 point)
     {
-        if (Physics.CheckBox(BlockPosition, new Vector3(0.3f, 0.3f, 0.3f), Quaternion.identity, 1 << 3))
+        Vector3 TargetPoint = new Vector3(
+            Mathf.Floor(point.x) + 0.5f,
+            Mathf.Floor(point.y) + 0.5f,
+            Mathf.Floor(point.z) + 0.5f
+        );
+
+        Vector3 halfExtents = new Vector3(.5f, .5f, .5f);
+
+        Collider[] Collisions = Physics.OverlapBox(TargetPoint, halfExtents);
+
+        foreach (Collider _collision in Collisions)
         {
-            return true;
+            if (_collision.gameObject.GetComponent<Player>() != null)
+            {
+                return true;
+            }
         }
+
         return false;
     }
+
 }

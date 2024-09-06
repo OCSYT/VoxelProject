@@ -81,14 +81,16 @@ public class ChunkManager : NetworkBehaviour
         public string Name;
         public float Y;
         public SerializableVector3 Position;
+        public string[] Hotbar;
 
         public PlayerData() { }
 
-        public PlayerData(string name, Vector3 position, float y)
+        public PlayerData(string name, Vector3 position, float y, string[] hotbar)
         {
             Name = name;
             Position = new SerializableVector3(position);
             Y = y;
+            Hotbar = hotbar;
         }
     }
 
@@ -171,7 +173,13 @@ public class ChunkManager : NetworkBehaviour
         {
             string playerName = player.gameObject.name;
             Vector3 playerPosition = (player.transform.position);
-            players.Add(new PlayerData(playerName, playerPosition, player.transform.eulerAngles.y));
+            List<string> HotbarBlocks = new List<string>();
+            foreach(byte block in player.BlockPlace.HotbarBlock)
+            {
+                HotbarBlocks.Add(GetBlockKey(BlockList, block));
+            }
+
+            players.Add(new PlayerData(playerName, playerPosition, player.transform.eulerAngles.y, HotbarBlocks.ToArray()));
         }
 
 
@@ -308,9 +316,22 @@ public class ChunkManager : NetworkBehaviour
         // Restore player positions
         foreach (Player player in GameObject.FindObjectsOfType<Player>())
         {
+
             bool hasPoint = false;
             foreach (PlayerData playerData in saveData.Players)
             {
+                List<byte> Hotbarblocks = new List<byte>();
+                foreach(string block in playerData.Hotbar)
+                {
+                    if (BlockList.ContainsKey(block))
+                    {
+                        Hotbarblocks.Add(BlockList[block]);
+                    }
+                }
+
+                player.BlockPlace.HotbarBlock = Hotbarblocks;
+                player.BlockPlace.InitializeHotbar();
+
                 if (player.gameObject.name == playerData.Name)
                 {
                     player.Teleport(playerData.Position.ToVector3(), playerData.Y, false);
@@ -468,12 +489,6 @@ public class ChunkManager : NetworkBehaviour
             }
             else
             {
-                if(WorldType == "earth")
-                {
-                    waterLevel = Mathf.RoundToInt(0.05f * ChunkSize * 8);
-                }
-
-
                 Vector3 SpawnPos = await GetFirstLandPosition(WorldType);
                 Player p = GameObject.FindObjectOfType<Player>();
                 p.Teleport(SpawnPos, 0, true);
@@ -627,15 +642,14 @@ public class ChunkManager : NetworkBehaviour
     }
 
 
- 
     void Update()
     {
-
 
         if (Vector3.Distance(Camera.main.transform.position, previousTargetPosition) > ChunkSize || previousTargetRotation != Mathf.Round(Camera.main.transform.rotation.eulerAngles.y))
         {
             previousTargetPosition = Camera.main.transform.position;
             previousTargetRotation = Mathf.Round(Camera.main.transform.rotation.eulerAngles.y);
+
             cancelledGeneration = true;
         }
 
@@ -652,7 +666,7 @@ public class ChunkManager : NetworkBehaviour
         float SkyValue = (GameTime) % 360;
         DirectionalLight.transform.rotation = Quaternion.Euler(SkyValue, 45, 0);
 
-        DirectionalLight.intensity = 2 * Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up);
+        DirectionalLight.intensity = Mathf.Clamp((2 * Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up)), 0.01f, 2);
         RenderSettings.ambientLight = AmbientColor * Mathf.Clamp(Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up), MinimumAmbient, 1);
 
 
@@ -755,86 +769,6 @@ public class ChunkManager : NetworkBehaviour
     public int worldFloor = -100;
     public int superflatHeight = 3;
 
-    float Errosion(Vector3 position, float scale)
-    {
-        float initialOffset = seed / 1000f;
-        float frequency = scale;
-
-        float sampleX = ((position.x) + initialOffset) * frequency;
-        float sampleY = ((position.z) + initialOffset) * frequency;
-
-
-        float perlinValue = (Mathf.PerlinNoise(sampleX, sampleY)) * 2 - 1f;
-
-        return perlinValue;
-    }
-
-    float Continentalness(Vector3 position, float scale, int octaves, float persistence, float lacunarity)
-    {
-        float initialOffset = seed / 1000f;
-
-        float amplitude = 1f;
-        float frequency = scale;
-        float continentalness = 0f;
-
-        for (int octave = 0; octave < octaves; octave++)
-        {
-            float sampleX = ((position.x) + initialOffset) * frequency;
-            float sampleY = ((position.z) + initialOffset) * frequency;
-
-            float perlinValue = Mathf.PerlinNoise(sampleX, sampleY) * 2f - 1f;
-            continentalness += perlinValue * amplitude;
-
-            amplitude *= persistence;
-            frequency *= lacunarity;
-        }
-
-        continentalness = Mathf.Clamp01((continentalness + 1f) / 2f);
-        continentalness = terrainCurve.Evaluate(continentalness);
-
-        return continentalness;
-    }
-    float Humidity(Vector3 position, float scale)
-    {
-        float initialOffset = seed / 100f;
-        float frequency = scale;
-
-        float sampleX = ((position.x) - initialOffset) * frequency;
-        float sampleY = ((position.z) - initialOffset) * frequency;
-
-
-        float perlinValue = (Mathf.PerlinNoise(sampleX, sampleY));
-
-        return perlinValue;
-    }
-
-
-    bool FoundEarthSpawn;
-    float EarthSpawn;
-    float EarthSpawnX;
-
-    IEnumerator GetEarthSpawn()
-    {
-        for (int x = 0; x < Mathf.Infinity; x++)
-        {
-            float[,] heights = FetchHeightDataFromTextureAsync(
-            0, 0, x * ChunkSize, 0, ChunkSize, ChunkSize, heightmapTexture).Result;
-
-            yield return null;
-
-            float height = Mathf.RoundToInt(heights[0,0] * ChunkSize);
-            Debug.Log("Height: " + height + ", Water Level: " + waterLevel);
-
-
-            if (height > waterLevel)
-            {
-                EarthSpawnX = x * ChunkSize;
-                EarthSpawn = height * 8;
-                FoundEarthSpawn = true;
-                break;
-            }
-        }
-    }
 
     async Task<Vector3> GetFirstLandPosition(string worldType)
     {
@@ -845,30 +779,13 @@ public class ChunkManager : NetworkBehaviour
             int flatHeight = worldFloor + superflatHeight;
             return new Vector3(0, flatHeight + 2, 0);
         }
-        else if (worldType == "earth")
-        {
-            StartCoroutine(GetEarthSpawn());
-            await Task.Run(async () =>
-            {
-                while (FoundEarthSpawn == false)
-                {
-                    await Task.Delay(1);
-                }
-            });
-            return new Vector3(0, EarthSpawn, EarthSpawnX);
-        }
 
         await Task.Run(async () =>
         {
             for (int x = 0; x < Mathf.Infinity; x++)
             {
                 Vector3 voxelPosition2D = new Vector3(0, 0, x);
-                float _Continentalness = Continentalness(voxelPosition2D, scale, 4, 0.5f, 2);
-                float _Errosion = Errosion(voxelPosition2D, scale / 5);
-
-                float perlinRaw = (_Continentalness * height) - _Errosion * height;
-                float perlinValue = perlinRaw;
-                int perlinRounded = (Mathf.RoundToInt(perlinValue));
+                float perlinRounded = (int)(Continentalness(voxelPosition2D, scale, 4, .5f, 2, .5f, .05f, .3f) * height); ;
 
                 if (perlinRounded > waterLevel)
                 {
@@ -923,46 +840,102 @@ public class ChunkManager : NetworkBehaviour
     }
 
 
-
-    public Texture2D heightmapTexture;
-    public Texture2D vegetationTexture;
-    public Texture2D tempertureTexture;
-    public int heightmapScale = 4;
-    async Task<float[,]> FetchHeightDataFromTextureAsync(
-        float minLatitude, float maxLatitude, float minLongitude, float maxLongitude,
-        int chunkWidth, int chunkHeight, Texture2D _heightmapTexture)
+    float RiverNoise(Vector3 position, float scale, float frequency, float riverWidth)
     {
-        float[,] heightData = new float[chunkWidth, chunkHeight];
-        int textureWidth = _heightmapTexture.width;
-        int textureHeight = _heightmapTexture.height;
+        float initialOffset = seed * 4 / 1000f;
+        // Apply a noise function to create a repeating river pattern
+        float sampleX = (position.x + initialOffset) * frequency;
+        float sampleY = (position.z + initialOffset) * frequency;
 
-        // Calculate the boundaries of the chunk in texture coordinates
-        float minX = Mathf.InverseLerp(-2f * heightmapScale, 2f * heightmapScale, minLongitude) * textureWidth; // Assuming the longitude range is -180 to 180
-        float maxX = Mathf.InverseLerp(-2f * heightmapScale, 2f * heightmapScale, maxLongitude) * textureWidth;
-        float minY = Mathf.InverseLerp(-1f * heightmapScale, 1f * heightmapScale, minLatitude) * textureHeight; // Assuming the latitude range is -90 to 90
-        float maxY = Mathf.InverseLerp(-1f * heightmapScale, 1f * heightmapScale, maxLatitude) * textureHeight;
+        // Use a sine wave and Perlin noise to create river-like structures
+        float riverNoise = Mathf.PerlinNoise(sampleX, sampleY);
 
-        for (int x = 0; x < chunkWidth; x++)
-        {
-            for (int z = 0; z < chunkHeight; z++)
-            {
-                // Map chunk coordinates to texture coordinates
-                float u = Mathf.Lerp(minX, maxX, x / (float)chunkWidth) / textureWidth;
-                float v = Mathf.Lerp(minY, maxY, z / (float)chunkHeight) / textureHeight;
+        // Use abs(sin) to create linear river paths
+        float river = Mathf.Abs(Mathf.Sin(riverNoise * Mathf.PI * scale));
 
-                heightData[x, z] = _heightmapTexture.GetPixelBilinear(u, v).grayscale;
-            }
-        }
+        // Normalize and scale by river width
+        river = Mathf.Clamp01(river * riverWidth);
 
-        return heightData;
+        return river;
     }
 
+    float Continentalness(Vector3 position, float scale, int octaves, float persistence, float lacunarity, float riverScale, float riverFrequency, float riverWidth)
+    {
+        float initialOffset = seed / 1000f;
+        float initialOffset2 = seed*10 / 1000f;
+        float initialOffset3 = seed * 2 * 10 / 1000f;
+
+        float amplitude = 1f;
+        float frequency = scale;
+        float continentalness = 0f;
+
+        for (int octave = 0; octave < octaves; octave++)
+        {
+            float sampleX = ((position.x) + initialOffset) * frequency;
+            float sampleY = ((position.z) + initialOffset) * frequency;
+
+            float perlinValue = Mathf.PerlinNoise(sampleX, sampleY) * 2f - 1f;
+            continentalness += perlinValue * amplitude;
+
+            amplitude *= persistence;
+            frequency *= lacunarity;
+        }
+
+        // Clamp and modify for terrain shaping
+        continentalness = Mathf.Clamp01((continentalness + 1f) / 2f);
+        continentalness = Mathf.Pow(continentalness, 2);
+
+        // Add rivers by subtracting river noise from the continentalness
+        float river = RiverNoise(position, riverScale, riverFrequency, riverWidth) * 
+            (Mathf.PerlinNoise((position.x + initialOffset2) * scale, (position.z + initialOffset2) * scale));
+
+        // Carve rivers into the terrain (subtract the river noise)
+        continentalness -= river;
+
+        return Mathf.Clamp01(continentalness)
+            * 
+            Mathf.Clamp((Mathf.PerlinNoise((position.x + initialOffset3) * scale, (position.z + initialOffset3) * scale)), 0.5f, 1);
+    }
+
+
+    float TemperatureMap(Vector3 position, float scale, int octaves, float persistence, float lacunarity)
+    {
+        float initialOffset = (seed * 2) / 1000f;
+
+        float amplitude = 1f;
+        float frequency = scale;
+        float temperature = 0f;
+
+        for (int octave = 0; octave < octaves; octave++)
+        {
+            float sampleX = ((position.x) + initialOffset) * frequency;
+            float sampleY = ((position.z) + initialOffset) * frequency;
+
+            float perlinValue = Mathf.PerlinNoise(sampleX, sampleY) * 2f - 1f;
+            temperature += perlinValue * amplitude;
+
+            amplitude *= persistence;
+            frequency *= lacunarity;
+        }
+
+        // Normalize temperature value to a range of 0 to 1
+        temperature = Mathf.Clamp((temperature + 1f) / 2f, 0f, 1f);
+
+        // Apply a custom remapping to give more space to the middle (temperate) values
+        // This formula compresses extremes and expands the mid-range
+        float midBias = .995f; // Adjust this value to control temperate zone dominance (higher = more temperate)
+        temperature = Mathf.Lerp(temperature, 0.5f, midBias);
+
+        // Remap the result back to the range of -1 to 1
+        temperature = Mathf.Lerp(-1f, 1f, temperature);
+
+        return temperature;
+    }
 
 
     async Task<byte[,,]> SetTerrainAsync(Chunk chunk, string terrainType)
     {
         bool superflat = terrainType == "superflat";
-        bool earthGeneration = terrainType == "earth";
 
         System.Random random = new System.Random(seed + (int)chunk.transform.position.x
             + (int)chunk.transform.position.y + (int)chunk.transform.position.z);
@@ -982,33 +955,12 @@ public class ChunkManager : NetworkBehaviour
         {
             waterLevel = worldFloor;
         }
-        if (earthGeneration)
-        {
-            waterLevel = Mathf.RoundToInt(0.05f * ChunkSize * 8);
-        }
 
-        float[,] heights = new float[0, 0];
-        float[,] vegetation = new float[0, 0];
-        float[,] temperture = new float[0,0];
-        if (!superflat && earthGeneration)
-        {
-            heights = await FetchHeightDataFromTextureAsync(
-    minLatitude, maxLatitude, minLongitude, maxLongitude, ChunkSize, ChunkSize, heightmapTexture);
-
-            vegetation = await FetchHeightDataFromTextureAsync(
-    minLatitude, maxLatitude, minLongitude, maxLongitude, ChunkSize, ChunkSize, vegetationTexture);
-
-            temperture = await FetchHeightDataFromTextureAsync(
-    minLatitude, maxLatitude, minLongitude, maxLongitude, ChunkSize, ChunkSize, tempertureTexture);
-        }
 
         for (int x = 0; x < ChunkSize; x++)
         {
             for (int z = 0; z < ChunkSize; z++)
             {
-
-                float veg = 0;
-                float temp = 0;
 
                 if (superflat)
                 {
@@ -1040,27 +992,8 @@ public class ChunkManager : NetworkBehaviour
 
                     Vector3 voxelPosition2D = chunkCornerWorldPos + new Vector3(x, 0, z);
 
-                    int heightRounded = 0;
-
-                    if (earthGeneration)
-                    {
-                        veg = vegetation[x, z];
-                        temp = 1 - temperture[x, z];
-                        float heightValue = heights[x, z];
-                        heightRounded = Mathf.RoundToInt(heightValue * ChunkSize * 8);
-                    }
-                    else
-                    {
-                        float _Continentalness = Continentalness(voxelPosition2D, scale, 4, 0.5f, 2);
-                        float _Humidity = Humidity(-voxelPosition2D, scale * 2);
-                        float _Temp = 1 - Humidity(voxelPosition2D, scale * 2);
-                        float _Errosion = Errosion(voxelPosition2D, scale / 5);
-                        float perlinRaw = (_Continentalness * height) - _Errosion * height;
-                        veg = _Humidity;
-                        temp = 1 - _Temp;
-                        heightRounded = Mathf.RoundToInt(perlinRaw);
-                    }
-
+                    int heightRounded = (int)(Continentalness(voxelPosition2D, scale, 4, .5f, 2, .5f, .05f, .3f) * height);
+                    float temp = TemperatureMap(voxelPosition2D, scale, 4, .5f, 2) * height;
                     Parallel.For(0, ChunkSize, y =>
                     {
 
@@ -1077,16 +1010,10 @@ public class ChunkManager : NetworkBehaviour
                         {
                             if (voxelPosition.y > perlinRounded && voxelPosition.y <= waterLevel)
                             {
-                                if (!earthGeneration)
+
+                                if (voxelPosition.y == waterLevel && temp < -0.5)
                                 {
-                                    if(voxelPosition.y == waterLevel && temp < 0.25)
-                                    {
-                                        voxelValue = BlockList["Ice"];
-                                    }
-                                    else
-                                    {
-                                        voxelValue = BlockList["Water"];
-                                    }
+                                    voxelValue = BlockList["Ice"];
                                 }
                                 else
                                 {
@@ -1109,19 +1036,19 @@ public class ChunkManager : NetworkBehaviour
                                         }
                                         else
                                         {
-                                            if (temp < 0.25)
+                                            if (temp < -0.5)
                                             {
                                                 voxelValue = BlockList["Snow Grass"]; //grass
                                             }
                                             else
                                             {
-                                                if (veg > 0.25)
+                                                if (temp > 0.5)
                                                 {
-                                                    voxelValue = BlockList["Grass"]; //grass
+                                                    voxelValue = BlockList["Sand"];
                                                 }
                                                 else
                                                 {
-                                                    voxelValue = BlockList["Sand"];
+                                                    voxelValue = BlockList["Grass"]; //grass
                                                 }
                                             }
                                         }
@@ -1156,10 +1083,16 @@ public class ChunkManager : NetworkBehaviour
             //surface decoration
             for (int x = 0; x < ChunkSize; x++)
             {
-                for (int y = 0; y < ChunkSize; y++)
+                for (int z = 0; z < ChunkSize; z++)
+
                 {
-                    for (int z = 0; z < ChunkSize; z++)
+                    Vector3 voxelPosition2D = chunkCornerWorldPos + new Vector3(x, 0, z);
+
+                    float temp = TemperatureMap(voxelPosition2D, scale, 4, .5f, 2) * height;
+                    for (int y = 0; y < ChunkSize; y++)
                     {
+
+
                         if (VoxelData[x, y, z] == BlockList["Stone"])
                         {
                             double RandomValue = random.NextDouble();
@@ -1363,7 +1296,7 @@ public class ChunkManager : NetworkBehaviour
                                 }
                             }
                         }
-                        else if (VoxelData[x, y, z] == BlockList["Sand"])
+                        else if (VoxelData[x, y, z] == BlockList["Sand"] && temp > 0.5)
                         {
                             if (y + 3 < ChunkSize && random.NextDouble() > 0.99f)
                             {

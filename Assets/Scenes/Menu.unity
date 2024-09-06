@@ -2141,8 +2141,6 @@ MonoBehaviour:
       m_Image: {fileID: 0}
     - m_Text: Superflat
       m_Image: {fileID: 0}
-    - m_Text: Earth
-      m_Image: {fileID: 0}
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -7183,7 +7181,7 @@ MonoBehaviour:
     textureNameMat: _EmissionAtlas
     textureName: atlas_emission.png
   - material: {fileID: 2100000, guid: b16e86c3aa868b74f844da96d487db18, type: 2}
-    textureNameMat: _BaseMap
+    textureNameMat: _MainTex
     textureName: player.png
   - material: {fileID: 2100000, guid: 443aadf76cc93294ca805778a05429a4, type: 2}
     textureNameMat: _MainTex
@@ -7191,6 +7189,9 @@ MonoBehaviour:
   - material: {fileID: 2100000, guid: 74e75c8067df8e84da6fd4e4f4f41541, type: 2}
     textureNameMat: _MainTex
     textureName: background.png
+  - material: {fileID: 2100000, guid: bbfa3ee1d5fc1644090912473e284dcb, type: 2}
+    textureNameMat: _BaseMap
+    textureName: dev_cape.png
 --- !u!4 &2059220293
 Transform:
   m_ObjectHideFlags: 0

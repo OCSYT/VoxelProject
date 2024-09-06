@@ -14,6 +14,7 @@ using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Reflection;
+using System.Linq;
 
 
 [RequireComponent(typeof(CharacterController))]
@@ -29,6 +30,7 @@ public class Player : NetworkBehaviour
     public Transform UsernameRoot;
     public int PlayerModelLayer;
     public GameObject PlayerModel;
+    public GameObject PlayerModelCape;
     public ChunkManager chunkManager;
     public BlockPlace BlockPlace;
     public Animator Anim;
@@ -87,7 +89,6 @@ public class Player : NetworkBehaviour
     private bool InWater = false;
     private bool CamInWater = false;
     public GameObject CamWaterFX;
-    public GameObject EarthMap;
     private bool chunkborders;
     public Camera[] DebugCameras;
     [HideInInspector]
@@ -95,8 +96,13 @@ public class Player : NetworkBehaviour
         new NetworkVariable<float>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
     [HideInInspector]
-    public NetworkVariable<FixedString32Bytes> Username =
-        new NetworkVariable<FixedString32Bytes>(new FixedString32Bytes(), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    public NetworkVariable<FixedString64Bytes> Username =
+        new NetworkVariable<FixedString64Bytes>(new FixedString64Bytes(), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
+    [HideInInspector]
+    public NetworkVariable<FixedString64Bytes> SkinURL =
+        new NetworkVariable<FixedString64Bytes>(new FixedString64Bytes(), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
     [HideInInspector]
     public NetworkVariable<bool> Synced = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     [HideInInspector]
@@ -105,6 +111,10 @@ public class Player : NetworkBehaviour
     public NetworkVariable<bool> Moving = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     private string TargetWorldName;
     private bool Teleporting = false;
+
+    public string[] Devs;
+
+
     public void Teleport(Vector3 Position, float EulerAngle, bool MakeNotInGround)
     {
         Teleporting = true;
@@ -165,19 +175,6 @@ public class Player : NetworkBehaviour
     {
         if (IsOwner)
         {
-            if (chunkManager)
-            {
-                if (chunkManager.WorldType == "earth")
-                {
-                    if (!Chatting && !IsPaused && !Chatting && !PickingBlock)
-                    {
-                        EarthMap.SetActive(Input.GetKey(KeyCode.M));
-                    }
-                }
-            }
-
-
-
             UpdatePlayerPositions();
 
             Chunk currentChunk = chunkManager.GetChunk(transform.position);
@@ -279,7 +276,8 @@ public class Player : NetworkBehaviour
         if (IsOwner)
         {
             Hosting.Value = IsHost;
-            Username.Value = (FixedString32Bytes)SteamClient.Name;
+            SkinURL.Value = PlayerPrefs.GetString("SkinURL", "");
+            Username.Value = (FixedString64Bytes)SteamClient.Name;
             LoadingScreen.SetActive(true);
             UsernameRoot.gameObject.SetActive(false);
 
@@ -301,6 +299,7 @@ public class Player : NetworkBehaviour
             chunkManager.gameObject.SetActive(false);
             playerCamera.gameObject.SetActive(false);
             PlayerModel.layer = PlayerModelLayer;
+            PlayerModelCape.layer = PlayerModelLayer;
         }
         gameObject.name = Username.Value.ToString();
 
@@ -591,8 +590,21 @@ public class Player : NetworkBehaviour
     }
 
 
+    bool SetCape = false;
+
     void Update()
     {
+
+        if(gameObject.name != "Player")
+        {
+            if(Devs.Contains(gameObject.name))
+            {
+                PlayerModelCape.SetActive(true);
+            }
+
+            SetCape = true;
+        }
+
         if(localPlayer == null)
         {
             localPlayer = GetLocal();
@@ -606,7 +618,8 @@ public class Player : NetworkBehaviour
 
 
         if (IsOwner == false) return;
-        if(chunkManager == null) return;
+
+        if (chunkManager == null) return;
         Cursor.visible = Cursor.lockState != CursorLockMode.Locked;
 
 
@@ -888,7 +901,7 @@ public class Player : NetworkBehaviour
         if (MoveAmount == 1)
         {
             Moving.Value = true; 
-            MovementDotY = (Vector3.Dot((transform.right), (playerVelocity))) * 5;
+            MovementDotY = Mathf.Clamp((Vector3.Dot((transform.right), (playerVelocity))) * 5, -45, 45);
         }
         else
         {
@@ -931,16 +944,25 @@ public class Player : NetworkBehaviour
 
         if (!IsPaused && !Chatting && !PickingBlock)
         {
-            Sprinting = Input.GetKey(KeyCode.LeftShift);
+            Sprinting = Input.GetKey(KeyCode.LeftControl);
             if (Sprinting)
             {
                 playerSpeed = OriginalSpeed * 1.5f;
+                if (Flying)
+                {
+                    playerSpeed = playerSpeed * 1.5f;
+                }
             }
             else
             {
                 playerSpeed = OriginalSpeed;
+                if (Flying)
+                {
+                    playerSpeed = playerSpeed * 1.5f;
+                }
             }
         }
+
 
         if (!Flying)
         {
@@ -1019,6 +1041,8 @@ public class Player : NetworkBehaviour
     void Pause()
     {
         pauseMenuUI.SetActive(true);
+        pauseMenuUI.transform.GetChild(0).GetChild(1).gameObject.SetActive(true);
+        pauseMenuUI.transform.GetChild(0).GetChild(2).gameObject.SetActive(false);
         IsPaused = true;
         Cursor.lockState = CursorLockMode.None;
     }

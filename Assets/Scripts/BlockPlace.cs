@@ -2,18 +2,16 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class BlockPlace : NetworkBehaviour
 {
-
     public float Dist = 25;
     public List<string> IgnoreBlocks = new List<string> { "air", "water", "lava" };
-    public List<Block> blockList; 
-    public Dictionary<byte, int[]> blockFaces = new Dictionary<byte, int[]>(); 
+    public List<Block> blockList;
+    public Dictionary<byte, int[]> blockFaces = new Dictionary<byte, int[]>();
     public string LookingAt = "";
     public Vector3 ChunkPosition;
     private int selectedBlockIndex = 0;
@@ -29,12 +27,24 @@ public class BlockPlace : NetworkBehaviour
     public GameObject PlaceSFX;
     public GameObject BreakSFX;
 
+    public GameObject HandModel;
+    public GameObject BlockModel;
+
+    // Hotbar elements
+    public Material TexRef;
+    public List<byte> HotbarBlock;
+    public List<GameObject> HotbarSlot;
+    public GameObject HotbarSelect; // Prefab for selected block highlight
+    public int CurrentHotbarslot = 0;
+
     [HideInInspector]
-    public List<(Vector3, Vector3, byte)> BufferedBlockEvents = new List<(Vector3, Vector3, byte) > ();
+    public List<(Vector3, Vector3, byte)> BufferedBlockEvents = new List<(Vector3, Vector3, byte)>();
+
     private IEnumerator Start()
     {
         yield return new WaitUntil(() => ChunkManager.Instance != null);
         chunkManager = ChunkManager.Instance;
+
         if (blockList == null)
         {
             blockList = new List<Block>();
@@ -68,7 +78,6 @@ public class BlockPlace : NetworkBehaviour
                     float col = textureID % blocksPerRow;
                     float blockX = col * (_BlockSize / atlasSize);
                     float blockY = row * (_BlockSize / atlasSize);
-                    float uvSize = 1.0f / blocksPerRow;
 
                     BOption.transform.GetChild(0).GetComponent<RawImage>().uvRect = new Rect(blockX, blockY, 1 / _BlockSize, 1 / _BlockSize);
 
@@ -78,18 +87,75 @@ public class BlockPlace : NetworkBehaviour
                 }
             }
         }
+
         if (IsOwner)
         {
+            InitializeHotbar();
             UpdateBlockVisual();
         }
     }
 
-    public void SwitchBlock(int index)
+    // Initialize the hotbar with the blocks and update visuals
+    bool SetMaterial;
+    public void InitializeHotbar()
     {
-        selectedBlockIndex = index;
-        UpdateBlockVisual();
+
+        for (int i = 0; i < HotbarSlot.Count; i++)
+        {
+            if (i < HotbarBlock.Count)
+            {
+
+                byte blockId = HotbarBlock[i];
+
+                if (blockId == 0)
+                {
+                    HotbarSlot[i].transform.GetComponent<RawImage>().material = null;
+                    HotbarSlot[i].transform.GetComponent<RawImage>().color = Color.white / 4;
+                }
+                else
+                {
+                    HotbarSlot[i].transform.GetComponent<RawImage>().material = TexRef;
+                    HotbarSlot[i].transform.GetComponent<RawImage>().color = Color.white;
+                    int textureID = chunkManager.BlockFaces[blockId][0];
+
+                    // Update hotbar slot UI with block texture
+                    float atlasSize = TextureSize;
+                    float _BlockSize = BlockSize;
+                    float blocksPerRow = atlasSize / _BlockSize;
+                    float row = Mathf.Floor(textureID / blocksPerRow);
+                    float col = textureID % blocksPerRow;
+                    float blockX = col * (_BlockSize / atlasSize);
+                    float blockY = row * (_BlockSize / atlasSize);
+                    HotbarSlot[i].transform.GetComponent<RawImage>().uvRect = new Rect(blockX, blockY, 1 / _BlockSize, 1 / _BlockSize);
+                }
+            }
+        }
+
+        SetMaterial = true;
+        UpdateHotbarSelection();
     }
 
+
+    private GameObject HotbarSelectPrev;
+    // Update the selected hotbar slot visual
+    private void UpdateHotbarSelection()
+    {
+        if (HotbarSelectPrev)
+        {
+            Destroy(HotbarSelectPrev);
+            HotbarSelectPrev = null;
+        }
+        HotbarSelectPrev = GameObject.Instantiate(HotbarSelect, HotbarSlot[CurrentHotbarslot].transform);
+        HotbarSelect.transform.localPosition = Vector3.zero;
+    }
+
+
+    public void SwitchBlock(int index)
+    {
+        HotbarBlock[CurrentHotbarslot] = blockList[index].blockId;
+        InitializeHotbar();
+        UpdateBlockVisual();
+    }
 
     private string FindKeyFromValue(Dictionary<string, byte> dictionary, byte value)
     {
@@ -107,8 +173,8 @@ public class BlockPlace : NetworkBehaviour
     {
         for (int i = 0; i < HandBlock.Length; i++)
         {
-            byte newTexID = (byte)chunkManager.BlockFaces[(byte)blockList[selectedBlockIndex].blockId][i];
-            byte blockId = blockList[selectedBlockIndex].blockId;
+            byte newTexID = (byte)chunkManager.BlockFaces[(byte)HotbarBlock[selectedBlockIndex]][i];
+            byte blockId = HotbarBlock[selectedBlockIndex];
 
             int textureID = newTexID == 0 ? blockId - 1 : newTexID;
 
@@ -119,7 +185,7 @@ public class BlockPlace : NetworkBehaviour
             float col = textureID % blocksPerRow;
             float blockX = col * (blockSize / atlasSize);
             float blockY = row * (blockSize / atlasSize);
-            float uvSize = 1.0f / blocksPerRow;
+
             Material copyMat = HandBlock[i].material;
             copyMat.SetColor("_Offset", new Color(blockX, blockY, 0));
             HandBlock[i].material = copyMat;
@@ -129,29 +195,67 @@ public class BlockPlace : NetworkBehaviour
     void Update()
     {
         if (IsOwner == false) return;
-        blockPreview.gameObject.SetActive(false);
-        if (player.IsPaused || player.Chatting || !player.AllowMovement || player.PickingBlock) return;
-        float scroll = Input.GetAxis("Mouse ScrollWheel");
 
+        if (HotbarBlock[selectedBlockIndex] == 0)
+        {
+            HandModel.SetActive(true);
+            BlockModel.SetActive(false);
+        }
+        else
+        {
+            HandModel.SetActive(false);
+            BlockModel.SetActive(true);
+        }
+
+        blockPreview.gameObject.SetActive(false);
+        if (player.IsPaused || player.Chatting || !player.AllowMovement) return;
+
+        if(Input.GetKeyDown(KeyCode.Q)) {
+            HotbarBlock[CurrentHotbarslot] = 0;
+            UpdateHotbarSelection();
+            InitializeHotbar();
+            UpdateBlockVisual();
+        }
+
+        for (int i = 0; i < HotbarSlot.Count; i++)
+        {
+            if (Input.GetKeyDown(KeyCode.Alpha1 + i))
+            {
+                CurrentHotbarslot = i;
+                selectedBlockIndex = CurrentHotbarslot;
+                UpdateHotbarSelection();
+                UpdateBlockVisual();
+            }
+        }
+
+
+        if (player.PickingBlock)
+        {
+            return;
+        }
+        // Scroll through the hotbar
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
         if (scroll > 0f)
         {
-            selectedBlockIndex = (selectedBlockIndex + 1) % blockList.Count;
+            CurrentHotbarslot = (CurrentHotbarslot + 1) % HotbarSlot.Count;
+            selectedBlockIndex = CurrentHotbarslot;
+            UpdateHotbarSelection();
             UpdateBlockVisual();
         }
         else if (scroll < 0f)
         {
-            selectedBlockIndex = (selectedBlockIndex - 1 + blockList.Count) % blockList.Count;
+            CurrentHotbarslot = (CurrentHotbarslot - 1 + HotbarSlot.Count) % HotbarSlot.Count;
+            selectedBlockIndex = CurrentHotbarslot;
+            UpdateHotbarSelection();
             UpdateBlockVisual();
         }
 
 
-
-
         Chunk currentChunk = chunkManager.GetChunk(transform.position);
-        if (currentChunk != null) {
+        if (currentChunk != null)
+        {
             ChunkPosition = currentChunk.currentPos;
         }
-
 
         RaycastHit CheckHit;
         if (Physics.Raycast(player.playerCamera.transform.position, player.playerCamera.transform.forward, out CheckHit, Dist, ~ignore))
@@ -167,7 +271,6 @@ public class BlockPlace : NetworkBehaviour
                 Mathf.Floor(targetPositionPreview.z) + 0.5f
             );
 
-
             blockPreview.transform.rotation = Quaternion.identity;
             blockPreview.gameObject.SetActive(true);
             LookingAt = FindKeyFromValue(chunkManager.BlockList, chunkManager.GetVoxelPosition(targetPosition));
@@ -178,16 +281,13 @@ public class BlockPlace : NetworkBehaviour
             LookingAt = "Air";
         }
 
-
-
+        // Left click to break blocks
         if (Input.GetMouseButtonDown(0))
         {
             RaycastHit hit;
 
-            // Perform a raycast
             if (Physics.Raycast(player.playerCamera.transform.position, player.playerCamera.transform.forward, out hit, Dist, ~ignore))
             {
-
                 Vector3 targetPosition = hit.point - hit.normal / 2f;
 
                 ChunkManager.Instance.SetVoxelAtWorldPosition(targetPosition, Vector3.zero, 0, true, true);
@@ -203,31 +303,31 @@ public class BlockPlace : NetworkBehaviour
                 Destroy(SFX, 5f);
             }
         }
-        if (Input.GetMouseButtonDown(1))
+
+        // Right click to place blocks
+        if (Input.GetMouseButtonDown(1) && HotbarBlock[selectedBlockIndex] != 0)
         {
             RaycastHit hit;
 
-            // Perform a raycast
             if (Physics.Raycast(player.playerCamera.transform.position, player.playerCamera.transform.forward, out hit, Dist, ~ignore))
             {
-
                 Vector3 targetPosition = hit.point + hit.normal / 2f;
                 if (PlayerInWay(targetPosition)) return;
 
                 Vector3 BlockDir = hit.normal.normalized;
-                if(BlockDir == Vector3.up || BlockDir == Vector3.down)
+                if (BlockDir == Vector3.up || BlockDir == Vector3.down)
                 {
                     BlockDir = -player.transform.forward.normalized;
                 }
 
-                ChunkManager.Instance.SetVoxelAtWorldPosition(targetPosition, BlockDir, blockList[selectedBlockIndex].blockId, true, true);
+                ChunkManager.Instance.SetVoxelAtWorldPosition(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], true, false);
                 if (IsHost)
                 {
-                    PlaceBlockServerRPC(targetPosition, BlockDir, blockList[selectedBlockIndex].blockId, true, true, NetworkManager.LocalClientId);
+                    PlaceBlockServerRPC(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], true, false, NetworkManager.LocalClientId);
                 }
                 else
                 {
-                    PlaceBlockServerRPC(targetPosition, BlockDir, blockList[selectedBlockIndex].blockId, false, true, NetworkManager.LocalClientId);
+                    PlaceBlockServerRPC(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], false, false, NetworkManager.LocalClientId);
                 }
                 GameObject SFX = GameObject.Instantiate(PlaceSFX, targetPosition, Quaternion.identity);
                 Destroy(SFX, 5f);
@@ -235,66 +335,18 @@ public class BlockPlace : NetworkBehaviour
         }
     }
 
-    bool PlayerInWay(Vector3 point)
+    [ServerRpc(RequireOwnership = false)]
+    public void PlaceBlockServerRPC(Vector3 Target, Vector3 Direction, byte BlockID, bool Host, bool Remove, ulong owner)
     {
-        Vector3 TargetPoint = new Vector3(
-            Mathf.Floor(point.x) + 0.5f,
-            Mathf.Floor(point.y) + 0.5f,
-            Mathf.Floor(point.z) + 0.5f
-        );
-
-        Vector3 halfExtents = new Vector3(.5f, .5f, .5f);
-
-        Collider[] Collisions = Physics.OverlapBox(TargetPoint, halfExtents);
-
-        foreach(Collider _collision in Collisions)
+        if (!Remove)
         {
-            if(_collision.gameObject.GetComponent<Player>() != null)
-            {
-                return true;
-            }
+            ChunkManager.Instance.SetVoxelAtWorldPosition(Target, Direction, BlockID, Host, Remove);
         }
-
-        return false;
-    }
-
-
-    public void PlaceBufferedBlocks()
-    {
-        foreach ((Vector3, Vector3, byte) BlockEvent in BufferedBlockEvents)
+        else
         {
-            ChunkManager.Instance.SetVoxelAtWorldPosition(BlockEvent.Item1, BlockEvent.Item2, BlockEvent.Item3, false, true);
+            ChunkManager.Instance.SetVoxelAtWorldPosition(Target, Vector3.zero, 0, Host, Remove);
         }
-        ChunkManager.Instance.ClearChunks();
-        BufferedBlockEvents.Clear();
-    }
-
-    [ServerRpc]
-    void PlaceBlockServerRPC(Vector3 position, Vector3 normal,  byte blockId, bool buffer, bool regenerate, ulong id)
-    {
-        PlaceBlockClientRPC(position, normal, blockId, buffer, regenerate, id);
-    }
-    [ClientRpc]
-    void PlaceBlockClientRPC(Vector3 position, Vector3 normal, byte blockId, bool buffer, bool regenerate, ulong id)
-    {
-        if (NetworkManager.LocalClientId != id)
-        {
-            ChunkManager.Instance.SetVoxelAtWorldPosition(position, normal, blockId, regenerate, true);
-            if (blockId != 0)
-            {
-                GameObject SFX = GameObject.Instantiate(PlaceSFX, position, Quaternion.identity);
-                Destroy(SFX, 5f);
-            }
-            else
-            {
-                GameObject SFX = GameObject.Instantiate(BreakSFX, position, Quaternion.identity);
-                Destroy(SFX, 5f);
-            }
-        }
-        if (buffer && IsHost)
-        {
-            BufferedBlockEvents.Add((position, normal, blockId));
-        }
+        BufferedBlockEvents.Add((Target, Direction, BlockID));
     }
 
     public class Block
@@ -307,5 +359,22 @@ public class BlockPlace : NetworkBehaviour
             this.name = name;
             this.blockId = blockId;
         }
+    }
+    public void PlaceBufferedBlocks()
+    {
+        foreach ((Vector3, Vector3, byte) BlockEvent in BufferedBlockEvents)
+        {
+            ChunkManager.Instance.SetVoxelAtWorldPosition(BlockEvent.Item1, BlockEvent.Item2, BlockEvent.Item3, false, true);
+        }
+        ChunkManager.Instance.ClearChunks();
+        BufferedBlockEvents.Clear();
+    }
+    public bool PlayerInWay(Vector3 BlockPosition)
+    {
+        if (Physics.CheckBox(BlockPosition, new Vector3(0.3f, 0.3f, 0.3f), Quaternion.identity, 1 << 3))
+        {
+            return true;
+        }
+        return false;
     }
 }

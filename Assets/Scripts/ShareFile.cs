@@ -6,7 +6,7 @@ using Unity.Netcode;
 
 public class ShareFile : NetworkBehaviour
 {
-    private const int ChunkSize = 512; // Adjust the chunk size as needed
+    private const int ChunkSize = 2048; // Adjust the chunk size as needed
     private Dictionary<ulong, List<byte[]>> receivedChunks = new Dictionary<ulong, List<byte[]>>();
 
     [ClientRpc]

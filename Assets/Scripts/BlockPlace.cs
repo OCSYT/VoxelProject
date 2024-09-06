@@ -340,9 +340,21 @@ public class BlockPlace : NetworkBehaviour
     {
         PlaceBlockClientRPC(position, normal, blockId, buffer, regenerate, id);
     }
+
     [ClientRpc]
     void PlaceBlockClientRPC(Vector3 position, Vector3 normal, byte blockId, bool buffer, bool regenerate, ulong id)
     {
+        StartCoroutine(WaitForChunkManagerThenPlaceBlock(position, normal, blockId, buffer, regenerate, id));
+    }
+
+    private IEnumerator WaitForChunkManagerThenPlaceBlock(Vector3 position, Vector3 normal, byte blockId, bool buffer, bool regenerate, ulong id)
+    {
+
+        while (ChunkManager.Instance == null)
+        {
+            yield return null;  
+        }
+
         if (NetworkManager.LocalClientId != id)
         {
             ChunkManager.Instance.SetVoxelAtWorldPosition(position, normal, blockId, regenerate, true);

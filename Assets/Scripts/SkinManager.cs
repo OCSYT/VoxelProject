@@ -17,10 +17,15 @@ public class SkinManager : NetworkBehaviour
         if (IsOwner)
         {
             ApplyTexture(PlayerPrefs.GetString("SkinURL", ""));
+            if (PlayerPrefs.GetString("SkinURL", "") != "")
+            {
+                ApplyTextureServerRPC(PlayerPrefs.GetString("SkinURL", ""));
+            }
         }
         else
         {
-            while(player.SkinURL.Value.ToString() == "")
+            yield return new WaitForSeconds(1);
+            while (player.SkinURL.Value.ToString() == "")
             {
                 yield return new WaitForSeconds(1);
             }
@@ -28,26 +33,24 @@ public class SkinManager : NetworkBehaviour
         }
     }
 
+
     public void ApplySettings()
     {
         PlayerPrefs.SetString("SkinURL", URLField.text);
         player.SkinURL.Value = PlayerPrefs.GetString("SkinURL", "");
         ApplyTexture(URLField.text);
-        ApplyTextureServerRPC();
+        ApplyTextureServerRPC(URLField.text);
     }
 
     [ServerRpc]
-    public void ApplyTextureServerRPC()
+    public void ApplyTextureServerRPC(string URL)
     {
-        ApplyTextureClientRPC();
+        ApplyTextureClientRPC(URL);
     }
     [ClientRpc]
-    public void ApplyTextureClientRPC()
+    public void ApplyTextureClientRPC(string URL)
     {
-        if (!IsOwner)
-        {
-            ApplyTexture(player.SkinURL.Value.ToString());
-        }
+        ApplyTexture(URL);
     }
 
 
@@ -64,7 +67,7 @@ public class SkinManager : NetworkBehaviour
 
             if (www.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogError("Failed to download texture: " + www.error);
+                Debug.Log("Invalid URL");
             }
             else
             {

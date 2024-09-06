@@ -102,8 +102,8 @@ public class Player : NetworkBehaviour
         new NetworkVariable<FixedString64Bytes>(new FixedString64Bytes(), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
     [HideInInspector]
-    public NetworkVariable<FixedString64Bytes> SkinURL =
-        new NetworkVariable<FixedString64Bytes>(new FixedString64Bytes(), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    public NetworkVariable<FixedString4096Bytes> SkinURL =
+        new NetworkVariable<FixedString4096Bytes>(new FixedString4096Bytes(), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
     [HideInInspector]
     public NetworkVariable<bool> Synced = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);

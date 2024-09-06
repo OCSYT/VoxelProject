@@ -595,7 +595,7 @@ public class Player : NetworkBehaviour
     void Update()
     {
 
-        if(gameObject.name != "Player")
+        if(gameObject.name != "Player" && !SetCape)
         {
             if(Devs.Contains(gameObject.name))
             {
@@ -998,7 +998,7 @@ public class Player : NetworkBehaviour
                 {
                     playerVelocity.y = playerSpeed;
                 }
-                else if (Input.GetKey(KeyCode.LeftControl))
+                else if (Input.GetKey(KeyCode.LeftShift))
                 {
                     playerVelocity.y = -playerSpeed;
                 }

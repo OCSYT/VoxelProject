@@ -320,14 +320,14 @@ public class BlockPlace : NetworkBehaviour
                     BlockDir = -player.transform.forward.normalized;
                 }
 
-                ChunkManager.Instance.SetVoxelAtWorldPosition(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], true, false);
+                ChunkManager.Instance.SetVoxelAtWorldPosition(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], true, true);
                 if (IsHost)
                 {
-                    PlaceBlockServerRPC(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], true, false, NetworkManager.LocalClientId);
+                    PlaceBlockServerRPC(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], true, true, NetworkManager.LocalClientId);
                 }
                 else
                 {
-                    PlaceBlockServerRPC(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], false, false, NetworkManager.LocalClientId);
+                    PlaceBlockServerRPC(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], false, true, NetworkManager.LocalClientId);
                 }
                 GameObject SFX = GameObject.Instantiate(PlaceSFX, targetPosition, Quaternion.identity);
                 Destroy(SFX, 5f);
@@ -362,6 +362,7 @@ public class BlockPlace : NetworkBehaviour
             BufferedBlockEvents.Add((position, normal, blockId));
         }
     }
+
 
 
     public class Block

@@ -1455,7 +1455,7 @@ MonoBehaviour:
   ChatCanvas: {fileID: 3605434420960808492}
   UsernameRoot: {fileID: 4588179915655575323}
   PlayerModelLayer: 9
-  PlayerModel: {fileID: 6074032624825140873}
+  PlayerModel: {fileID: 2331833447863843784}
   PlayerModelCape: {fileID: 453662849142543226}
   chunkManager: {fileID: 751794549677066701}
   BlockPlace: {fileID: 1095550317611875800}
@@ -3389,7 +3389,7 @@ GameObject:
   - component: {fileID: 6927001341961396853}
   - component: {fileID: 3622305977139141891}
   m_Layer: 8
-  m_Name: Cube.001
+  m_Name: PlayerModel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

@@ -82,6 +82,7 @@ public class Player : NetworkBehaviour
     public bool Chatting = false;
     private Player localPlayer;
     private bool Sprinting;
+    private bool Crouching;
     private bool Flying;
     private float DoublePressTime = 0.25f;
     private float LastSpacePressTime = 0f;
@@ -90,6 +91,7 @@ public class Player : NetworkBehaviour
     private bool CamInWater = false;
     public GameObject CamWaterFX;
     private bool chunkborders;
+    private Vector3 CamStart;
     public Camera[] DebugCameras;
     [HideInInspector]
     public NetworkVariable<float> GameTime = 
@@ -109,6 +111,8 @@ public class Player : NetworkBehaviour
     public NetworkVariable<bool> Hosting = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     [HideInInspector]
     public NetworkVariable<bool> Moving = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    [HideInInspector]
+    public NetworkVariable<bool> Crouch = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     private string TargetWorldName;
     private bool Teleporting = false;
 
@@ -165,6 +169,7 @@ public class Player : NetworkBehaviour
 
     private void Awake()
     {
+        CamStart = playerCamera.transform.localPosition;
         CurrentGravity = gravityValue;
         OriginalSpeed = playerSpeed;
         controller = gameObject.GetComponent<CharacterController>();
@@ -894,6 +899,7 @@ public class Player : NetworkBehaviour
     private void LateUpdate()
     {
         Anim.SetBool("Moving", Moving.Value);
+        Anim.SetBool("Crouching", Crouch.Value);
         if (IsOwner == false) return;
         float playerVelocityAmount = new Vector3(playerVelocity.x, 0, playerVelocity.z).magnitude;
         float MoveAmount = Mathf.Clamp01(Mathf.Abs(Mathf.RoundToInt(playerVelocityAmount)));
@@ -947,6 +953,7 @@ public class Player : NetworkBehaviour
             Sprinting = Input.GetKey(KeyCode.LeftControl);
             if (Sprinting)
             {
+                Crouching = false;
                 playerSpeed = OriginalSpeed * 1.5f;
                 if (Flying)
                 {
@@ -955,14 +962,36 @@ public class Player : NetworkBehaviour
             }
             else
             {
+                Crouching = Input.GetKey(KeyCode.LeftShift);
+
                 playerSpeed = OriginalSpeed;
                 if (Flying)
                 {
                     playerSpeed = playerSpeed * 1.5f;
                 }
+                else
+                {
+                    if (Crouching)
+                    {
+                        playerSpeed = OriginalSpeed / 2;
+                    }
+                }
             }
         }
+        else
+        {
+            Sprinting = false;
+            Crouching = false;
+        }
+        if (Crouching)
+        {
+            playerCamera.transform.localPosition = CamStart + Vector3.down * 0.25f;
+        }
+        else {
+            playerCamera.transform.localPosition = CamStart;
+        }
 
+        Crouch.Value = Crouching;
 
         if (!Flying)
         {

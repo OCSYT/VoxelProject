@@ -328,7 +328,7 @@ public class Player : NetworkBehaviour
 
     IEnumerator GetCapes()
     {
-        string cacheBusterUrl = capeJsonUrl + "?random=" + UnityEngine.Random.value;
+        string cacheBusterUrl = capeJsonUrl + "?random=" + UnityEngine.Random.value * 100;
         UnityWebRequest.ClearCookieCache();
         using (UnityWebRequest request = UnityWebRequest.Get(cacheBusterUrl))
         {
@@ -342,6 +342,7 @@ public class Player : NetworkBehaviour
             }
             string jsonResponse = request.downloadHandler.text;
             UserList = JsonUtility.FromJson<UserCapeList>(jsonResponse);
+            yield return new WaitForSeconds(1);
             UpdateCapes();
         }
     }

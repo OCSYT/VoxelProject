@@ -752,15 +752,37 @@ public class ChunkManager : NetworkBehaviour
             {
                 chunk.SetVoxel(voxelData.Item1.x, voxelData.Item1.y, voxelData.Item1.z, voxelData.Item3);
                 chunk.SetDirection(voxelData.Item1.x, voxelData.Item1.y, voxelData.Item1.z, voxelData.Item2);
+                if (voxelData.Item4) //If use Cache
+                {
+                    if (!chunkCache.ContainsKey(chunkPosition))
+                    {
+                        chunkCacheDirection[chunkPosition] = chunk.GetDirectionData();
+                        byte[,,] _ChunkData = chunk.GetData();
+                        string[,,] CacheData = new string[ChunkSize, ChunkSize, ChunkSize];
+                        for (int x = 0; x < ChunkSize; x++)
+                        {
+                            for (int y = 0; y < ChunkSize; y++)
+                            {
+                                for (int z = 0; z < ChunkSize; z++)
+                                {
+                                    CacheData[x, y, z] = GetBlockKey(BlockList, _ChunkData[x, y, z]);
+                                }
+                            }
+                        }
+
+
+                        chunkCache[chunkPosition] = CacheData;
+                    }
+                    chunkCache[chunkPosition][voxelData.Item1.x, voxelData.Item1.y, voxelData.Item1.z] = GetBlockKey(BlockList, voxelData.Item3);
+                    chunkCacheDirection[chunkPosition][voxelData.Item1.x, voxelData.Item1.y, voxelData.Item1.z] = voxelData.Item2;
+                }
             }
+
             voxelDataForNonExistentChunks.Remove(chunkPosition);
         }
 
         chunk.GenerateTerrain();
     }
-
-
-
 
 
     public float waterLevel = 10;
@@ -1346,7 +1368,7 @@ public class ChunkManager : NetworkBehaviour
 
 
 
-    private Dictionary<Vector3Int, List<(Vector3Int, byte, byte)>> voxelDataForNonExistentChunks = new Dictionary<Vector3Int, List<(Vector3Int, byte, byte)>>();
+    private Dictionary<Vector3Int, List<(Vector3Int, byte, byte, bool)>> voxelDataForNonExistentChunks = new Dictionary<Vector3Int, List<(Vector3Int, byte, byte, bool)>>();
 
     public string GetBlockKey(Dictionary<string, byte> dictionary, byte value)
     {
@@ -1451,9 +1473,9 @@ public class ChunkManager : NetworkBehaviour
         {
             if (!voxelDataForNonExistentChunks.ContainsKey(chunkPosition))
             {
-                voxelDataForNonExistentChunks[chunkPosition] = new List<(Vector3Int, byte, byte)>();
+                voxelDataForNonExistentChunks[chunkPosition] = new List<(Vector3Int, byte, byte, bool)>();
             }
-            voxelDataForNonExistentChunks[chunkPosition].Add((localVoxelPosition, FinalRotation, voxelValue));
+            voxelDataForNonExistentChunks[chunkPosition].Add((localVoxelPosition, FinalRotation, voxelValue, useCache));
         }
     }
 

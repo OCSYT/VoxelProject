@@ -5,6 +5,7 @@ using TMPro;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UI;
+using static BlockPlace;
 
 public class BlockPlace : NetworkBehaviour
 {
@@ -36,6 +37,33 @@ public class BlockPlace : NetworkBehaviour
     public List<GameObject> HotbarSlot;
     public GameObject HotbarSelect; // Prefab for selected block highlight
     public int CurrentHotbarslot = 0;
+
+    public class Ref<T>
+    {
+        private T backing;
+        public T Value
+        {
+            get { return backing; }
+            set { backing = value; }
+        }
+
+        public Ref(T reference)
+        {
+            backing = reference;
+        }
+    }
+
+    Ref<bool> CanBreak = new Ref<bool>(true);
+    Ref<bool> CanPlace = new Ref<bool>(true);
+    private float BlockEventTime = .15f;
+
+
+    IEnumerator BlockChangeEvent(Ref<bool> EventVal)
+    {
+        EventVal.Value = false;
+        yield return new WaitForSeconds(BlockEventTime);
+        EventVal.Value = true;
+    }
 
     [HideInInspector]
     public List<(Vector3, Vector3, byte)> BufferedBlockEvents = new List<(Vector3, Vector3, byte)>();
@@ -90,6 +118,10 @@ public class BlockPlace : NetworkBehaviour
 
         if (IsOwner)
         {
+            while(player.AllowMovement == false)
+            {
+                yield return new WaitForSeconds(.1f);
+            }
             InitializeHotbar();
             UpdateBlockVisual();
         }
@@ -282,8 +314,11 @@ public class BlockPlace : NetworkBehaviour
         }
 
         // Left click to break blocks
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButton(0) && CanBreak.Value)
         {
+
+            StartCoroutine(BlockChangeEvent(CanBreak));
+
             RaycastHit hit;
 
             if (Physics.Raycast(player.playerCamera.transform.position, player.playerCamera.transform.forward, out hit, Dist, ~ignore))
@@ -305,8 +340,11 @@ public class BlockPlace : NetworkBehaviour
         }
 
         // Right click to place blocks
-        if (Input.GetMouseButtonDown(1) && HotbarBlock[selectedBlockIndex] != 0)
+        if (Input.GetMouseButton(1) && HotbarBlock[selectedBlockIndex] != 0 && CanPlace.Value)
         {
+
+            StartCoroutine(BlockChangeEvent(CanPlace));
+
             RaycastHit hit;
 
             if (Physics.Raycast(player.playerCamera.transform.position, player.playerCamera.transform.forward, out hit, Dist, ~ignore))

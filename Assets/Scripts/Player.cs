@@ -93,6 +93,10 @@ public class Player : NetworkBehaviour
     private bool chunkborders;
     private Vector3 CamStart;
     public Camera[] DebugCameras;
+    public float SprintFOV = 20;
+    private float OriginalFOV = 70;
+    public Transform CamPos;
+
     [HideInInspector]
     public NetworkVariable<float> GameTime = 
         new NetworkVariable<float>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -329,7 +333,16 @@ public class Player : NetworkBehaviour
     private void OnDestroy()
     {
         SendChatMessageLocal("<color=yellow>" + Username.Value.ToString() + " has left");
+        if (IsHost && !IsOwner)
+        {
+            Player host = GetHost();
+            if (this != host)
+            {
+                host.chunkManager.SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
+            }
+        }
     }
+
     public Player GetHost()
     {
         foreach (Player p in GameObject.FindObjectsOfType<Player>())
@@ -933,20 +946,79 @@ public class Player : NetworkBehaviour
         transform.Rotate(Vector3.up * mouseX);
     }
 
+
     void Move()
     {
         if (controller.enabled == false) return;
+
+
+        if (Sprinting && Moving.Value)
+        {
+            if (Camera.main)
+            {
+                Camera.main.fieldOfView = Mathf.Lerp(Camera.main.fieldOfView, OriginalFOV + SprintFOV, 15 * Time.deltaTime);
+            }
+        }
+        else
+        {
+            if (Camera.main)
+            {
+                Camera.main.fieldOfView = Mathf.Lerp(Camera.main.fieldOfView, OriginalFOV, 15 * Time.deltaTime);
+            }
+        }
+
         RaycastHit hit;
-        float radius = .1f;
-        groundedPlayer = Physics.SphereCast(transform.position, radius, -Vector3.up, out hit, (1.1f - radius), ~ignore);
+        RaycastHit LedgeHit;
+        float radius = 0.25f;
+        float ledgeDistance = .25f;
+
+        // Ground detection (checks directly below player)
+        groundedPlayer = Physics.SphereCast(
+            transform.position,
+            radius,
+            -Vector3.up,
+            out hit,
+            1.1f - radius,
+            ~ignore
+        );
+
+
+        Vector3 move = (!IsPaused && !Chatting && !PickingBlock)
+    ? (transform.right * Input.GetAxis("Horizontal") + transform.forward * Input.GetAxis("Vertical"))
+    : Vector3.zero;
+
+
+        Vector3 forwardDirection = new Vector3(move.x, 0, move.z) * ledgeDistance;
+        bool isNearLedge = Physics.Raycast(transform.position + forwardDirection, -Vector3.up, out LedgeHit, 1.1f, ~ignore);
+
+        // Prevent player from falling through ground
         if (groundedPlayer && playerVelocity.y < 0)
         {
             playerVelocity.y = 0f;
         }
 
-        Vector3 move = !(!IsPaused && !Chatting && !PickingBlock) ? Vector3.zero : transform.right * Input.GetAxis("Horizontal") + transform.forward * Input.GetAxis("Vertical");
-        playerVelocity.x = move.x * playerSpeed;
-        playerVelocity.z = move.z * playerSpeed;
+
+        // Apply different velocity logic for crouching
+        if (Crouching && groundedPlayer)
+        {
+            // Only allow movement if ledge is detected while crouching
+            if (isNearLedge)
+            {
+                playerVelocity.x = move.x * playerSpeed;
+                playerVelocity.z = move.z * playerSpeed;
+            }
+            else
+            {
+                playerVelocity.x = 0;
+                playerVelocity.z = 0;
+            }
+        }
+        else
+        {
+            // Normal movement when not crouching
+            playerVelocity.x = move.x * playerSpeed;
+            playerVelocity.z = move.z * playerSpeed;
+        }
 
         if (!IsPaused && !Chatting && !PickingBlock)
         {
@@ -983,12 +1055,32 @@ public class Player : NetworkBehaviour
             Sprinting = false;
             Crouching = false;
         }
+
         if (Crouching)
         {
-            playerCamera.transform.localPosition = CamStart + Vector3.down * 0.25f;
+            RaycastHit CamHit;
+            RaycastHit CamHit2;
+            RaycastHit CamHit3;
+            RaycastHit CamHit4;
+            if (!Physics.Raycast(CamPos.position, -playerCamera.transform.forward, out CamHit, 1, ~ignore) 
+                && !Physics.Raycast(CamPos.position - Vector3.up, -playerCamera.transform.forward, out CamHit2, 1, ~ignore)
+                && !Physics.Raycast(CamPos.position, -playerCamera.transform.up, out CamHit3, 1, ~ignore)
+                && !Physics.Raycast(CamPos.position - Vector3.up, -playerCamera.transform.up, out CamHit4, 1, ~ignore))
+            {
+                playerCamera.transform.localPosition = Vector3.Lerp(playerCamera.transform.localPosition,
+    CamStart + (Vector3.down * 0.25f - Vector3.forward *
+    Mathf.Clamp(Vector3.Dot(playerCamera.transform.forward, -Vector3.up), 0, 1) * 0.5f), 15 * Time.deltaTime);
+            }
+            else
+            {
+                playerCamera.transform.localPosition = Vector3.Lerp(playerCamera.transform.localPosition,
+    CamStart + (Vector3.down * 0.25f), 15 * Time.deltaTime);
+            }
         }
-        else {
-            playerCamera.transform.localPosition = CamStart;
+        else
+        {
+            playerCamera.transform.localPosition = Vector3.Lerp(playerCamera.transform.localPosition,
+                CamStart, 15 * Time.deltaTime);
         }
 
         Crouch.Value = Crouching;
@@ -1084,6 +1176,8 @@ public class Player : NetworkBehaviour
         }
         StartCoroutine(WaitForQuit());
     }
+
+
     IEnumerator WaitForQuit()
     {
         while (chunkManager.saving)

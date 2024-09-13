@@ -342,7 +342,7 @@ public class Player : NetworkBehaviour
             }
             string jsonResponse = request.downloadHandler.text;
             UserList = JsonUtility.FromJson<UserCapeList>(jsonResponse);
-            yield return new WaitForSeconds(1);
+            yield return new WaitForSeconds(3);
             UpdateCapes();
         }
     }
@@ -355,7 +355,7 @@ public class Player : NetworkBehaviour
 
         foreach (UserCape user in UserList.users)
         {
-            if (Regex.Replace(gameObject.name.ToUpper(), @"\s+", "") == Regex.Replace(user.steamname.ToUpper(), @"\s+", "") && !SetCape)
+            if (gameObject.name == user.steamname && !SetCape)
             {
                 Debug.Log(user.steamname + ": " + user.cape);
                 if (user.cape == "Developer")

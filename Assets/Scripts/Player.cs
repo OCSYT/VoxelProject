@@ -16,6 +16,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Reflection;
 using System.Linq;
 using UnityEngine.Networking;
+using System.Text.RegularExpressions;
 
 
 [RequireComponent(typeof(CharacterController))]
@@ -327,7 +328,7 @@ public class Player : NetworkBehaviour
 
     IEnumerator GetCapes()
     {
-        string cacheBusterUrl = capeJsonUrl + "?t=" + System.DateTime.Now.Ticks;
+        string cacheBusterUrl = capeJsonUrl + "?random=" + UnityEngine.Random.value;
         UnityWebRequest.ClearCookieCache();
         using (UnityWebRequest request = UnityWebRequest.Get(cacheBusterUrl))
         {
@@ -353,8 +354,9 @@ public class Player : NetworkBehaviour
 
         foreach (UserCape user in UserList.users)
         {
-            if (gameObject.name == user.steamname && !SetCape)
+            if (Regex.Replace(gameObject.name.ToUpper(), @"\s+", "") == Regex.Replace(user.steamname.ToUpper(), @"\s+", "") && !SetCape)
             {
+                Debug.Log(user.steamname + ": " + user.cape);
                 if (user.cape == "Developer")
                 {
                     PlayerModelCape.SetActive(true);
@@ -366,10 +368,11 @@ public class Player : NetworkBehaviour
                     PlayerModelCape.GetComponent<MeshRenderer>().material = CapeMaterial[1];
                 }
                 SetCape = true;
-                break; 
+                break;
             }
         }
     }
+
 
     public void CopyCode()
     {

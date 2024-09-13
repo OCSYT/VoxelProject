@@ -7192,6 +7192,9 @@ MonoBehaviour:
   - material: {fileID: 2100000, guid: bbfa3ee1d5fc1644090912473e284dcb, type: 2}
     textureNameMat: _BaseMap
     textureName: dev_cape.png
+  - material: {fileID: 2100000, guid: 36dc7591896ffba4c8873ad90a9f7cce, type: 2}
+    textureNameMat: _BaseMap
+    textureName: playtester_cape.png
 --- !u!4 &2059220293
 Transform:
   m_ObjectHideFlags: 0

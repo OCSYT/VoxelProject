@@ -474,7 +474,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: bbfa3ee1d5fc1644090912473e284dcb, type: 2}
+  - {fileID: -876546973899608171, guid: 7abed632008b351419371778df267f53, type: 3}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1457,6 +1457,9 @@ MonoBehaviour:
   PlayerModelLayer: 9
   PlayerModel: {fileID: 6299646369833442444}
   PlayerModelCape: {fileID: 453662849142543226}
+  CapeMaterial:
+  - {fileID: 2100000, guid: bbfa3ee1d5fc1644090912473e284dcb, type: 2}
+  - {fileID: 2100000, guid: 36dc7591896ffba4c8873ad90a9f7cce, type: 2}
   chunkManager: {fileID: 751794549677066701}
   BlockPlace: {fileID: 1095550317611875800}
   Anim: {fileID: 8828648676710866606}
@@ -5931,8 +5934,7 @@ MonoBehaviour:
     m_InternalValue: 0
   Crouch:
     m_InternalValue: 0
-  Devs:
-  - BracketProto
+  capeJsonUrl: https://raw.githubusercontent.com/OCSYT/VoxelProject/main/Capes.json
   Spawned: 0
 --- !u!114 &1095550317611875800
 MonoBehaviour:

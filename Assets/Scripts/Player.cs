@@ -15,6 +15,7 @@ using System.IO.Compression;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Reflection;
 using System.Linq;
+using UnityEngine.Networking;
 
 
 [RequireComponent(typeof(CharacterController))]
@@ -31,6 +32,7 @@ public class Player : NetworkBehaviour
     public int PlayerModelLayer;
     public GameObject PlayerModel;
     public GameObject PlayerModelCape;
+    public Material[] CapeMaterial;
     public ChunkManager chunkManager;
     public BlockPlace BlockPlace;
     public Animator Anim;
@@ -96,7 +98,7 @@ public class Player : NetworkBehaviour
     public float SprintFOV = 20;
     private float OriginalFOV = 70;
     public Transform CamPos;
-
+    private UserCapeList UserList;
     [HideInInspector]
     public NetworkVariable<float> GameTime = 
         new NetworkVariable<float>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -120,7 +122,6 @@ public class Player : NetworkBehaviour
     private string TargetWorldName;
     private bool Teleporting = false;
 
-    public string[] Devs;
 
 
     public void Teleport(Vector3 Position, float EulerAngle, bool MakeNotInGround)
@@ -281,7 +282,7 @@ public class Player : NetworkBehaviour
 
     private void Start()
     {
-
+        StartCoroutine(GetCapes());
         if (IsOwner)
         {
             Hosting.Value = IsHost;
@@ -321,6 +322,52 @@ public class Player : NetworkBehaviour
                 host.chunkManager.SyncSave(this.OwnerClientId);
             }
             host.SyncRequestServerRPC();
+        }
+    }
+
+    IEnumerator GetCapes()
+    {
+        string cacheBusterUrl = capeJsonUrl + "?t=" + System.DateTime.Now.Ticks;
+        UnityWebRequest.ClearCookieCache();
+        using (UnityWebRequest request = UnityWebRequest.Get(cacheBusterUrl))
+        {
+            request.redirectLimit = 1;
+            yield return request.SendWebRequest();
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError("Failed to fetch cape data: " + request.error);
+                yield break;
+            }
+            string jsonResponse = request.downloadHandler.text;
+            UserList = JsonUtility.FromJson<UserCapeList>(jsonResponse);
+            UpdateCapes();
+        }
+    }
+
+    [SerializeField] private string capeJsonUrl = "https://raw.githubusercontent.com/OCSYT/VoxelProject/main/Capes.json";
+    private bool SetCape = false;
+    private void UpdateCapes()
+    {
+        if (UserList == null || UserList.users.Length == 0) return;
+
+        foreach (UserCape user in UserList.users)
+        {
+            if (gameObject.name == user.steamname && !SetCape)
+            {
+                if (user.cape == "Developer")
+                {
+                    PlayerModelCape.SetActive(true);
+                    PlayerModelCape.GetComponent<MeshRenderer>().material = CapeMaterial[0];
+                }
+                else if (user.cape == "Playtester")
+                {
+                    PlayerModelCape.SetActive(true);
+                    PlayerModelCape.GetComponent<MeshRenderer>().material = CapeMaterial[1];
+                }
+                SetCape = true;
+                break; 
+            }
         }
     }
 
@@ -420,6 +467,17 @@ public class Player : NetworkBehaviour
         }
     }
 
+    [System.Serializable]
+    public class UserCape
+    {
+        public string steamname;
+        public string cape;
+    }
+    [System.Serializable]
+    public class UserCapeList
+    {
+        public UserCape[] users;
+    }
 
     public static byte[] CompressData(List<(Vector3, Vector3, byte)> blockEvents)
     {
@@ -608,20 +666,8 @@ public class Player : NetworkBehaviour
     }
 
 
-    bool SetCape = false;
-
     void Update()
     {
-
-        if(gameObject.name != "Player" && !SetCape)
-        {
-            if(Devs.Contains(gameObject.name))
-            {
-                PlayerModelCape.SetActive(true);
-            }
-
-            SetCape = true;
-        }
 
         if(localPlayer == null)
         {

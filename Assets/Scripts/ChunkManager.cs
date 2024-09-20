@@ -358,6 +358,7 @@ public class ChunkManager : NetworkBehaviour
     {
         public string Name = "New Block";
         public byte Value = 0;
+        public bool Destructable = true;
         public int FrontFace = 0;
         public int BackFace = 0;
         public int LeftFace = 0;
@@ -1491,7 +1492,8 @@ public class ChunkManager : NetworkBehaviour
         if (activeChunks.ContainsKey(chunkPosition))
         {
             Chunk chunk = activeChunks[chunkPosition];
-            Vector3 localPosition = chunk.transform.InverseTransformPoint(worldPosition);
+            Vector3 localPosition = (worldPosition) - chunkPosition * ChunkSize;
+
 
             int voxelX = Mathf.FloorToInt(localPosition.x);
             int voxelY = Mathf.FloorToInt(localPosition.y);

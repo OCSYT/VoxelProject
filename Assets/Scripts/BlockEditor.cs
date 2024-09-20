@@ -85,6 +85,7 @@ public class ChunkManagerEditor : Editor
             EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 9, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("Transparent"));
             EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 10, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("NoCollision"));
             EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 11, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("NoPlayerCollision"));
+            EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight * 12, rect.width, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("Destructable"));
 
             if (AtlasTexture != null)
             {
@@ -111,7 +112,7 @@ public class ChunkManagerEditor : Editor
     {
         float buttonWidth = 20f;
         float buttonHeight = EditorGUIUtility.singleLineHeight;
-        float buttonY = rect.y + EditorGUIUtility.singleLineHeight * 10;
+        float buttonY = rect.y + EditorGUIUtility.singleLineHeight * 12;
         float buttonX = rect.x + rect.width - buttonWidth * 4; // Adjusting for four buttons
 
         // Move up button
@@ -193,7 +194,7 @@ public class ChunkManagerEditor : Editor
         float baseHeight = EditorGUIUtility.singleLineHeight;
         if (blockFoldouts[index])
         {
-            baseHeight += EditorGUIUtility.singleLineHeight * 11; // Height for 9 properties + 2 buttons in Block class
+            baseHeight += EditorGUIUtility.singleLineHeight * 13; // Height for 9 properties + 2 buttons in Block class
         }
         return baseHeight;
     }

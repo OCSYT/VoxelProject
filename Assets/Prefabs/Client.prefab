@@ -5993,6 +5993,10 @@ MonoBehaviour:
   HotbarSelect: {fileID: 1818599331742068024, guid: 41cb5b3e43c84d04c893827975b209c3,
     type: 3}
   CurrentHotbarslot: 0
+  TNT: {fileID: 6485300457332617482, guid: 2ff2364c74823f148abb3b26b998628a, type: 3}
+  TNTFX: {fileID: 2944941102797615948, guid: 8d555b0f35df45248b39e22943db06d3, type: 3}
+  TNT_Radius: 5
+  TNT_Time: 3
 --- !u!114 &4700905182909629859
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12334,6 +12338,7 @@ MonoBehaviour:
   Blocks:
   - Name: Air
     Value: 0
+    Destructable: 0
     FrontFace: 0
     BackFace: 0
     LeftFace: 0
@@ -12346,6 +12351,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Grass
     Value: 1
+    Destructable: 1
     FrontFace: 255
     BackFace: 255
     LeftFace: 255
@@ -12358,6 +12364,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Dirt
     Value: 2
+    Destructable: 1
     FrontFace: 1
     BackFace: 1
     LeftFace: 1
@@ -12370,6 +12377,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Stone
     Value: 3
+    Destructable: 1
     FrontFace: 2
     BackFace: 2
     LeftFace: 2
@@ -12382,6 +12390,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Cobblestone
     Value: 4
+    Destructable: 1
     FrontFace: 3
     BackFace: 3
     LeftFace: 3
@@ -12394,6 +12403,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Mossy Cobblestone
     Value: 45
+    Destructable: 1
     FrontFace: 244
     BackFace: 244
     LeftFace: 244
@@ -12406,6 +12416,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Snow Grass
     Value: 45
+    Destructable: 1
     FrontFace: 254
     BackFace: 254
     LeftFace: 254
@@ -12418,6 +12429,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Snow
     Value: 45
+    Destructable: 1
     FrontFace: 11
     BackFace: 11
     LeftFace: 11
@@ -12430,6 +12442,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Ice
     Value: 45
+    Destructable: 1
     FrontFace: 12
     BackFace: 12
     LeftFace: 12
@@ -12442,6 +12455,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Stone Bricks
     Value: 5
+    Destructable: 1
     FrontFace: 4
     BackFace: 4
     LeftFace: 4
@@ -12454,6 +12468,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Bricks
     Value: 45
+    Destructable: 1
     FrontFace: 20
     BackFace: 20
     LeftFace: 20
@@ -12466,6 +12481,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Stone Slab
     Value: 45
+    Destructable: 1
     FrontFace: 19
     BackFace: 19
     LeftFace: 19
@@ -12478,6 +12494,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Oak Planks
     Value: 6
+    Destructable: 1
     FrontFace: 221
     BackFace: 221
     LeftFace: 221
@@ -12490,6 +12507,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Oak Log
     Value: 7
+    Destructable: 1
     FrontFace: 222
     BackFace: 222
     LeftFace: 222
@@ -12502,6 +12520,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Oak Leaves
     Value: 8
+    Destructable: 1
     FrontFace: 220
     BackFace: 220
     LeftFace: 220
@@ -12514,6 +12533,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Birch Planks
     Value: 45
+    Destructable: 1
     FrontFace: 205
     BackFace: 205
     LeftFace: 205
@@ -12526,6 +12546,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Birch Log
     Value: 45
+    Destructable: 1
     FrontFace: 206
     BackFace: 206
     LeftFace: 206
@@ -12538,6 +12559,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Birch Leaves
     Value: 45
+    Destructable: 1
     FrontFace: 204
     BackFace: 204
     LeftFace: 204
@@ -12550,6 +12572,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Spruce Planks
     Value: 45
+    Destructable: 1
     FrontFace: 189
     BackFace: 189
     LeftFace: 189
@@ -12562,6 +12585,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Spruce Log
     Value: 45
+    Destructable: 1
     FrontFace: 190
     BackFace: 190
     LeftFace: 190
@@ -12574,6 +12598,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Spruce Leaves
     Value: 45
+    Destructable: 1
     FrontFace: 188
     BackFace: 188
     LeftFace: 188
@@ -12586,6 +12611,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Glass
     Value: 9
+    Destructable: 1
     FrontFace: 8
     BackFace: 8
     LeftFace: 8
@@ -12598,6 +12624,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Glowstone
     Value: 10
+    Destructable: 1
     FrontFace: 9
     BackFace: 9
     LeftFace: 9
@@ -12610,6 +12637,7 @@ MonoBehaviour:
     Light: {r: 1.4980394, g: 1.4980394, b: 1.4980394, a: 1}
   - Name: Sand
     Value: 11
+    Destructable: 1
     FrontFace: 10
     BackFace: 10
     LeftFace: 10
@@ -12622,6 +12650,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Gravel
     Value: 45
+    Destructable: 1
     FrontFace: 243
     BackFace: 243
     LeftFace: 243
@@ -12634,6 +12663,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Lava
     Value: 15
+    Destructable: 0
     FrontFace: 14
     BackFace: 14
     LeftFace: 14
@@ -12646,6 +12676,7 @@ MonoBehaviour:
     Light: {r: 1, g: 0, b: 0, a: 1}
   - Name: Water
     Value: 16
+    Destructable: 0
     FrontFace: 15
     BackFace: 15
     LeftFace: 15
@@ -12658,6 +12689,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Crafting Table
     Value: 17
+    Destructable: 1
     FrontFace: 28
     BackFace: 29
     LeftFace: 28
@@ -12670,6 +12702,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Furnace
     Value: 18
+    Destructable: 1
     FrontFace: 45
     BackFace: 46
     LeftFace: 46
@@ -12682,6 +12715,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Coal Ore
     Value: 19
+    Destructable: 1
     FrontFace: 250
     BackFace: 250
     LeftFace: 250
@@ -12694,6 +12728,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Iron Ore
     Value: 20
+    Destructable: 1
     FrontFace: 249
     BackFace: 249
     LeftFace: 249
@@ -12706,6 +12741,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Gold Ore
     Value: 21
+    Destructable: 1
     FrontFace: 248
     BackFace: 248
     LeftFace: 248
@@ -12718,6 +12754,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Lapis Lazuli
     Value: 22
+    Destructable: 1
     FrontFace: 247
     BackFace: 247
     LeftFace: 247
@@ -12730,6 +12767,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Redstone Ore
     Value: 23
+    Destructable: 1
     FrontFace: 252
     BackFace: 252
     LeftFace: 252
@@ -12742,6 +12780,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Emerald Ore
     Value: 31
+    Destructable: 1
     FrontFace: 246
     BackFace: 246
     LeftFace: 246
@@ -12754,6 +12793,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Diamond Ore
     Value: 24
+    Destructable: 1
     FrontFace: 251
     BackFace: 251
     LeftFace: 251
@@ -12766,6 +12806,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Lapis Block
     Value: 25
+    Destructable: 1
     FrontFace: 234
     BackFace: 234
     LeftFace: 234
@@ -12778,6 +12819,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0.042243958, b: 2, a: 1}
   - Name: Redstone Block
     Value: 26
+    Destructable: 1
     FrontFace: 239
     BackFace: 239
     LeftFace: 239
@@ -12790,6 +12832,7 @@ MonoBehaviour:
     Light: {r: 2, g: 0, b: 0, a: 1}
   - Name: Iron Block
     Value: 27
+    Destructable: 1
     FrontFace: 235
     BackFace: 235
     LeftFace: 235
@@ -12802,6 +12845,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Gold Block
     Value: 28
+    Destructable: 1
     FrontFace: 236
     BackFace: 236
     LeftFace: 236
@@ -12814,6 +12858,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Emerald Block
     Value: 29
+    Destructable: 1
     FrontFace: 238
     BackFace: 238
     LeftFace: 238
@@ -12826,6 +12871,7 @@ MonoBehaviour:
     Light: {r: 0, g: 2, b: 0.23576927, a: 1}
   - Name: Diamond Block
     Value: 30
+    Destructable: 1
     FrontFace: 237
     BackFace: 237
     LeftFace: 237
@@ -12838,6 +12884,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: White Wool
     Value: 31
+    Destructable: 1
     FrontFace: 272
     BackFace: 272
     LeftFace: 272
@@ -12850,6 +12897,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Light Gray Wool
     Value: 32
+    Destructable: 1
     FrontFace: 288
     BackFace: 288
     LeftFace: 288
@@ -12862,6 +12910,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Grey Wool
     Value: 33
+    Destructable: 1
     FrontFace: 304
     BackFace: 304
     LeftFace: 304
@@ -12874,6 +12923,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Black Wool
     Value: 34
+    Destructable: 1
     FrontFace: 64
     BackFace: 64
     LeftFace: 64
@@ -12886,6 +12936,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Brown Wool
     Value: 35
+    Destructable: 1
     FrontFace: 80
     BackFace: 80
     LeftFace: 80
@@ -12898,6 +12949,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Red Wool
     Value: 36
+    Destructable: 1
     FrontFace: 96
     BackFace: 96
     LeftFace: 96
@@ -12910,6 +12962,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Orange Wool
     Value: 36
+    Destructable: 1
     FrontFace: 112
     BackFace: 112
     LeftFace: 112
@@ -12922,6 +12975,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Yellow Wool
     Value: 37
+    Destructable: 1
     FrontFace: 128
     BackFace: 128
     LeftFace: 128
@@ -12934,6 +12988,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Lime Wool
     Value: 38
+    Destructable: 1
     FrontFace: 144
     BackFace: 144
     LeftFace: 144
@@ -12946,6 +13001,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Green Wool
     Value: 39
+    Destructable: 1
     FrontFace: 160
     BackFace: 160
     LeftFace: 160
@@ -12958,6 +13014,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Cyan Wool
     Value: 40
+    Destructable: 1
     FrontFace: 176
     BackFace: 176
     LeftFace: 176
@@ -12970,6 +13027,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Light Blue Wool
     Value: 41
+    Destructable: 1
     FrontFace: 192
     BackFace: 192
     LeftFace: 192
@@ -12982,6 +13040,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Blue Wool
     Value: 42
+    Destructable: 1
     FrontFace: 208
     BackFace: 208
     LeftFace: 208
@@ -12994,6 +13053,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Purple Wool
     Value: 43
+    Destructable: 1
     FrontFace: 224
     BackFace: 224
     LeftFace: 224
@@ -13006,6 +13066,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Magenta Wool
     Value: 44
+    Destructable: 1
     FrontFace: 240
     BackFace: 240
     LeftFace: 240
@@ -13018,6 +13079,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Pink Wool
     Value: 45
+    Destructable: 1
     FrontFace: 17
     BackFace: 17
     LeftFace: 17
@@ -13030,6 +13092,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: TNT
     Value: 45
+    Destructable: 1
     FrontFace: 21
     BackFace: 21
     LeftFace: 21
@@ -13042,6 +13105,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Obsidian
     Value: 45
+    Destructable: 0
     FrontFace: 241
     BackFace: 241
     LeftFace: 241
@@ -13054,6 +13118,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Bedrock
     Value: 45
+    Destructable: 0
     FrontFace: 242
     BackFace: 242
     LeftFace: 242
@@ -13066,6 +13131,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Bookshelf
     Value: 45
+    Destructable: 1
     FrontFace: 245
     BackFace: 245
     LeftFace: 245
@@ -13078,6 +13144,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Chest
     Value: 45
+    Destructable: 1
     FrontFace: 42
     BackFace: 43
     LeftFace: 43
@@ -13090,6 +13157,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Cactus
     Value: 45
+    Destructable: 1
     FrontFace: 24
     BackFace: 24
     LeftFace: 24
@@ -13102,6 +13170,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Tall Grass
     Value: 45
+    Destructable: 1
     FrontFace: 26
     BackFace: 26
     LeftFace: 26
@@ -13114,6 +13183,7 @@ MonoBehaviour:
     Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Roses
     Value: 45
+    Destructable: 1
     FrontFace: 41
     BackFace: 41
     LeftFace: 41

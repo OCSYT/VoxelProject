@@ -96,7 +96,7 @@ public class Player : NetworkBehaviour
     private bool chunkborders;
     private Vector3 CamStart;
     public Camera[] DebugCameras;
-    public float SprintFOV = 20;
+    public float SprintFOV = 30;
     private float OriginalFOV = 70;
     public Transform CamPos;
     private UserCapeList UserList;

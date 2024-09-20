@@ -7192,9 +7192,27 @@ MonoBehaviour:
   - material: {fileID: 2100000, guid: bbfa3ee1d5fc1644090912473e284dcb, type: 2}
     textureNameMat: _BaseMap
     textureName: dev_cape.png
+  - material: {fileID: 2100000, guid: 93f3e4e050c590e40a4ccb61f3dd209d, type: 2}
+    textureNameMat: _Atlas
+    textureName: atlas.png
   - material: {fileID: 2100000, guid: 36dc7591896ffba4c8873ad90a9f7cce, type: 2}
     textureNameMat: _BaseMap
     textureName: playtester_cape.png
+  - material: {fileID: 2100000, guid: 93f3e4e050c590e40a4ccb61f3dd209d, type: 2}
+    textureNameMat: _EmissionAtlas
+    textureName: atlas_emission.png
+  - material: {fileID: 2100000, guid: fe7baf1f6254d89448d916c10e991868, type: 2}
+    textureNameMat: _EmissionAtlas
+    textureName: atlas_emission.png
+  - material: {fileID: 2100000, guid: fe7baf1f6254d89448d916c10e991868, type: 2}
+    textureNameMat: _Atlas
+    textureName: atlas.png
+  - material: {fileID: 2100000, guid: e6fb2bfaf30156140adb8d9772cffded, type: 2}
+    textureNameMat: _Atlas
+    textureName: atlas.png
+  - material: {fileID: 2100000, guid: e6fb2bfaf30156140adb8d9772cffded, type: 2}
+    textureNameMat: _EmissionAtlas
+    textureName: atlas_emission.png
 --- !u!4 &2059220293
 Transform:
   m_ObjectHideFlags: 0

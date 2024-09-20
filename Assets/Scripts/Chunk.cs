@@ -214,49 +214,48 @@ public class Chunk : MonoBehaviour
 
         // Forward pass
 
-        Task.Run(() =>
+
+        Parallel.For(0, chunkSize, x =>
         {
-            Parallel.For(0, chunkSize, x =>
+            for (int y = 0; y < chunkSize; y++)
             {
-                for (int y = 0; y < chunkSize; y++)
+                for (int z = 0; z < chunkSize; z++)
                 {
-                    for (int z = 0; z < chunkSize; z++)
-                    {
-                        Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
+                    Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
 
-                        if (voxelPosition.y <= waterLevel && voxelPosition.y > worldFloor && VoxelData[x, y, z] == airBlock)
+                    if (voxelPosition.y <= waterLevel && voxelPosition.y > worldFloor && VoxelData[x, y, z] == airBlock)
+                    {
+                        if (CheckForWaterNeighbor(x, y, z))
                         {
-                            if (CheckForWaterNeighbor(x, y, z))
-                            {
-                                VoxelData[x, y, z] = waterBlock;
-                            }
+                            VoxelData[x, y, z] = waterBlock;
                         }
                     }
                 }
-            });
+            }
+        });
 
-            // Reverse pass
-            Parallel.For(0, chunkSize, i =>
+        // Reverse pass
+        Parallel.For(0, chunkSize, i =>
+        {
+            int x = chunkSize - 1 - i;
+            for (int y = chunkSize - 1; y >= 0; y--)
             {
-                int x = chunkSize - 1 - i;
-                for (int y = chunkSize - 1; y >= 0; y--)
+                for (int z = chunkSize - 1; z >= 0; z--)
                 {
-                    for (int z = chunkSize - 1; z >= 0; z--)
-                    {
-                        Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
+                    Vector3 voxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
 
-                        if (voxelPosition.y <= waterLevel && voxelPosition.y > worldFloor && VoxelData[x, y, z] == airBlock)
+                    if (voxelPosition.y <= waterLevel && voxelPosition.y > worldFloor && VoxelData[x, y, z] == airBlock)
+                    {
+                        if (CheckForWaterNeighbor(x, y, z))
                         {
-                            if (CheckForWaterNeighbor(x, y, z))
-                            {
-                                VoxelData[x, y, z] = waterBlock;
-                            }
+                            VoxelData[x, y, z] = waterBlock;
                         }
                     }
                 }
-            });
+            }
         });
     }
+        
 
 
 
@@ -818,7 +817,7 @@ public class Chunk : MonoBehaviour
             {
                 string KeyName = GetBlockKey(BlockList, neighborBlockID);
 
-                bool isNeighborSameType = (neighborBlockID == currentBlockID && !KeyName.Contains("Leaves"));
+                bool isNeighborSameType = (neighborBlockID == currentBlockID && !KeyName.Contains("Leaves") && !KeyName.Contains("Tall Grass") && !KeyName.Contains("Roses"));
                 if ((!isNeighborSameType && isNeighborTransparent) || neighborBlockID == BlockList["Air"])
                 {
                     return true;
@@ -859,7 +858,7 @@ public class Chunk : MonoBehaviour
                 else
                 {
                     string KeyName = GetBlockKey(BlockList, neighborBlockID);
-                    bool isNeighborSameType = (neighborBlockID == currentBlockID && !KeyName.Contains("Leaves"));
+                    bool isNeighborSameType = (neighborBlockID == currentBlockID && !KeyName.Contains("Leaves") && !KeyName.Contains("Tall Grass") && !KeyName.Contains("Roses"));
                     if ((!isNeighborSameType && isNeighborTransparent) || neighborBlockID == BlockList["Air"])
                     {
                         return true;

@@ -1,11 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO.Compression;
+using System.IO;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UI;
-using static BlockPlace;
+using System.Threading.Tasks;
+using System.Linq;
 
 public class BlockPlace : NetworkBehaviour
 {
@@ -38,6 +41,10 @@ public class BlockPlace : NetworkBehaviour
     public GameObject HotbarSelect; // Prefab for selected block highlight
     public int CurrentHotbarslot = 0;
 
+    public GameObject TNT;
+    public GameObject TNTFX;
+    public int TNT_Radius = 8;
+    public float TNT_Time = 3;
     public class Ref<T>
     {
         private T backing;
@@ -242,7 +249,8 @@ public class BlockPlace : NetworkBehaviour
         blockPreview.gameObject.SetActive(false);
         if (player.IsPaused || player.Chatting || !player.AllowMovement) return;
 
-        if(Input.GetKeyDown(KeyCode.Q)) {
+        if (Input.GetKeyDown(KeyCode.Q))
+        {
             HotbarBlock[CurrentHotbarslot] = 0;
             UpdateHotbarSelection();
             InitializeHotbar();
@@ -314,61 +322,319 @@ public class BlockPlace : NetworkBehaviour
         }
 
         // Left click to break blocks
-        if (Input.GetMouseButton(0) && CanBreak.Value)
+        if (ChunkManager.Instance != null)
         {
-
-            StartCoroutine(BlockChangeEvent(CanBreak));
-
-            RaycastHit hit;
-
-            if (Physics.Raycast(player.playerCamera.transform.position, player.playerCamera.transform.forward, out hit, Dist, ~ignore))
+            if (Input.GetMouseButton(0) && CanBreak.Value)
             {
-                Vector3 targetPosition = hit.point - hit.normal / 2f;
 
-                ChunkManager.Instance.SetVoxelAtWorldPosition(targetPosition, Vector3.zero, 0, true, true);
-                if (IsHost)
+                StartCoroutine(BlockChangeEvent(CanBreak));
+
+                RaycastHit hit;
+
+                if (Physics.Raycast(player.playerCamera.transform.position, player.playerCamera.transform.forward, out hit, Dist, ~ignore))
                 {
-                    PlaceBlockServerRPC(targetPosition, Vector3.zero, 0, true, true, NetworkManager.LocalClientId);
+                    Vector3 targetPosition = hit.point - hit.normal / 2f;
+
+                    if (Vector3Int.FloorToInt(targetPosition).y != ChunkManager.Instance.worldFloor)
+                    {
+
+                        byte BlockID = ChunkManager.Instance.GetVoxelPosition(targetPosition);
+
+                        string BlockName = ChunkManager.Instance.GetBlockKey(ChunkManager.Instance.BlockList, BlockID);
+
+
+                        if (BlockName == "TNT" && player.Crouch.Value == false)
+                        {
+                            TNTServerRPC(targetPosition);
+                        }
+
+                        ChunkManager.Instance.SetVoxelAtWorldPosition(targetPosition, Vector3.zero, 0, true, true);
+                        if (IsHost)
+                        {
+                            PlaceBlockServerRPC(targetPosition, Vector3.zero, 0, true, true, NetworkManager.LocalClientId);
+                        }
+                        else
+                        {
+                            PlaceBlockServerRPC(targetPosition, Vector3.zero, 0, false, true, NetworkManager.LocalClientId);
+                        }
+                        GameObject SFX = GameObject.Instantiate(BreakSFX, targetPosition, Quaternion.identity);
+                        Destroy(SFX, 5f);
+                    }
                 }
-                else
+            }
+
+            // Right click to place blocks
+            if (Input.GetMouseButton(1) && HotbarBlock[selectedBlockIndex] != 0 && CanPlace.Value)
+            {
+
+                StartCoroutine(BlockChangeEvent(CanPlace));
+
+                RaycastHit hit;
+
+                if (Physics.Raycast(player.playerCamera.transform.position, player.playerCamera.transform.forward, out hit, Dist, ~ignore))
                 {
-                    PlaceBlockServerRPC(targetPosition, Vector3.zero, 0, false, true, NetworkManager.LocalClientId);
+                    Vector3 targetPosition = hit.point + hit.normal / 2f;
+                    if (PlayerInWay(targetPosition)) return;
+
+                    Vector3 BlockDir = hit.normal.normalized;
+                    if (BlockDir == Vector3.up || BlockDir == Vector3.down)
+                    {
+                        BlockDir = -player.transform.forward.normalized;
+                    }
+
+                    ChunkManager.Instance.SetVoxelAtWorldPosition(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], true, true);
+                    if (IsHost)
+                    {
+                        PlaceBlockServerRPC(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], true, true, NetworkManager.LocalClientId);
+                    }
+                    else
+                    {
+                        PlaceBlockServerRPC(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], false, true, NetworkManager.LocalClientId);
+                    }
+                    GameObject SFX = GameObject.Instantiate(PlaceSFX, targetPosition, Quaternion.identity);
+                    Destroy(SFX, 5f);
                 }
-                GameObject SFX = GameObject.Instantiate(BreakSFX, targetPosition, Quaternion.identity);
-                Destroy(SFX, 5f);
             }
         }
+    }
 
-        // Right click to place blocks
-        if (Input.GetMouseButton(1) && HotbarBlock[selectedBlockIndex] != 0 && CanPlace.Value)
+
+    public static async Task<byte[]> SerializeChunksAsync(List<Vector3Int> chunks)
+    {
+        using (MemoryStream memoryStream = new MemoryStream())
         {
-
-            StartCoroutine(BlockChangeEvent(CanPlace));
-
-            RaycastHit hit;
-
-            if (Physics.Raycast(player.playerCamera.transform.position, player.playerCamera.transform.forward, out hit, Dist, ~ignore))
+            using (BinaryWriter writer = new BinaryWriter(memoryStream))
             {
-                Vector3 targetPosition = hit.point + hit.normal / 2f;
-                if (PlayerInWay(targetPosition)) return;
+                writer.Write(chunks.Count);
+                foreach (var chunk in chunks)
+                {
+                    writer.Write(chunk.x);
+                    writer.Write(chunk.y);
+                    writer.Write(chunk.z);
+                }
+            }
+            return await Task.FromResult(memoryStream.ToArray());
+        }
+    }
 
-                Vector3 BlockDir = hit.normal.normalized;
-                if (BlockDir == Vector3.up || BlockDir == Vector3.down)
+    // Convert the byte array back to a List<Vector3Int>
+    public static async Task<List<Vector3Int>> DeserializeChunksAsync(byte[] data)
+    {
+        List<Vector3Int> chunks = new List<Vector3Int>();
+        using (MemoryStream memoryStream = new MemoryStream(data))
+        {
+            using (BinaryReader reader = new BinaryReader(memoryStream))
+            {
+                int count = reader.ReadInt32();
+                for (int i = 0; i < count; i++)
                 {
-                    BlockDir = -player.transform.forward.normalized;
+                    int x = reader.ReadInt32();
+                    int y = reader.ReadInt32();
+                    int z = reader.ReadInt32();
+                    chunks.Add(new Vector3Int(x, y, z));
                 }
+            }
+        }
+        return await Task.FromResult(chunks);
+    }
 
-                ChunkManager.Instance.SetVoxelAtWorldPosition(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], true, true);
-                if (IsHost)
+    // Compress the serialized byte array
+    public static async Task<byte[]> CompressAsync(byte[] data)
+    {
+        using (MemoryStream memoryStream = new MemoryStream())
+        {
+            using (GZipStream gzip = new GZipStream(memoryStream, CompressionMode.Compress))
+            {
+                await gzip.WriteAsync(data, 0, data.Length);
+            }
+            return memoryStream.ToArray();
+        }
+    }
+
+    // Decompress the byte array
+    public static async Task<byte[]> DecompressAsync(byte[] compressedData)
+    {
+        using (MemoryStream memoryStream = new MemoryStream(compressedData))
+        {
+            using (MemoryStream decompressedStream = new MemoryStream())
+            {
+                using (GZipStream gzip = new GZipStream(memoryStream, CompressionMode.Decompress))
                 {
-                    PlaceBlockServerRPC(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], true, true, NetworkManager.LocalClientId);
+                    await gzip.CopyToAsync(decompressedStream);
                 }
-                else
+                return decompressedStream.ToArray();
+            }
+        }
+    }
+
+
+
+    [ServerRpc]
+    void TNTServerRPC(Vector3 position)
+    {
+        TNTClientRPC(position);
+    }
+
+    HashSet<Rigidbody> TNT_Instances = new HashSet<Rigidbody>();
+    [ClientRpc]
+    void TNTClientRPC(Vector3 position)
+    {
+        Vector3 targetPoint = new Vector3(
+            Mathf.Floor(position.x) + 0.5f,
+            Mathf.Floor(position.y) + 0.5f,
+            Mathf.Floor(position.z) + 0.5f
+        );
+
+        GameObject tntInstance = GameObject.Instantiate(TNT, targetPoint, Quaternion.identity);
+        Rigidbody tntRigidbody = tntInstance.GetComponent<Rigidbody>();
+        TNT_Instances.Add(tntRigidbody);
+        StartCoroutine(TNT_Explode(tntInstance, tntRigidbody));
+        StartCoroutine(TNT_Check(tntInstance));
+    }
+
+    IEnumerator TNT_Check(GameObject instance)
+    {
+        Rigidbody tntRB = instance.GetComponent<Rigidbody>();
+        while (instance != null)
+        {
+            Chunk chunk = ChunkManager.Instance.GetChunk(instance.transform.position);
+            tntRB.isKinematic = chunk == null;
+            yield return new WaitForSecondsRealtime((TNT_Instances.Count / 10) / 2);
+        }
+    }
+
+    IEnumerator TNT_Explode(GameObject instance, Rigidbody instanceBody)
+    {
+        yield return new WaitForSeconds(TNT_Time - UnityEngine.Random.value);
+        Vector3 instancePoint = instance.transform.position;
+        float sqrTNTRadius = TNT_Radius * TNT_Radius;
+
+        if (IsOwner)
+        {
+            HashSet<Vector3Int> chunksToRegenerate = new HashSet<Vector3Int>();
+            List<Vector3> tntPoints = new List<Vector3>();
+            List<Vector3> points = new List<Vector3>();
+
+
+            for (int x = -TNT_Radius; x <= TNT_Radius; x++)
+            {
+                yield return new WaitForFixedUpdate();
+                for (int y = -TNT_Radius; y <= TNT_Radius; y++)
                 {
-                    PlaceBlockServerRPC(targetPosition, BlockDir, HotbarBlock[selectedBlockIndex], false, true, NetworkManager.LocalClientId);
+                    for (int z = -TNT_Radius; z <= TNT_Radius; z++)
+                    {
+                        Vector3 offset = new Vector3(x, y, z);
+                        Vector3 currentPoint = instancePoint + offset;
+
+                        if (offset.sqrMagnitude <= sqrTNTRadius)
+                        {
+                            Chunk chunk = ChunkManager.Instance.GetChunk(currentPoint);
+                            if (chunk != null)
+                            {
+                                chunksToRegenerate.Add(chunk.currentPos);
+                            }
+
+                            byte voxelID = ChunkManager.Instance.GetVoxelPosition(currentPoint);
+                            foreach (var blockInfo in ChunkManager.Instance.Blocks)
+                            {
+                                if (voxelID == blockInfo.Value)
+                                {
+                                    if (blockInfo.Name == "TNT" && Vector3Int.FloorToInt(currentPoint) != Vector3Int.FloorToInt(instancePoint))
+                                    {
+                                        tntPoints.Add(currentPoint);
+                                    }
+
+                                    if (blockInfo.Destructable)
+                                    {
+                                        ChunkManager.Instance.SetVoxelAtWorldPosition(currentPoint, Vector3.zero, 0, false, true);
+                                        if (IsHost)
+                                        {
+                                            PlaceBlockServerRPC(currentPoint, Vector3.zero, 0, true, false, NetworkManager.LocalClientId);
+                                        }
+                                        else
+                                        {
+                                            PlaceBlockServerRPC(currentPoint, Vector3.zero, 0, false, false, NetworkManager.LocalClientId);
+                                        }
+                                    }
+                                    break; // Exit loop after finding the block
+                                }
+                            }
+                        }
+                    }
                 }
-                GameObject SFX = GameObject.Instantiate(PlaceSFX, targetPosition, Quaternion.identity);
-                Destroy(SFX, 5f);
+            }
+
+
+            yield return new WaitForSecondsRealtime(0.1f);
+            RegnenerateTNTChunksServerRPCAsync(chunksToRegenerate.ToList());
+
+            TNT_Instances.Remove(instanceBody);
+            Destroy(instance);
+
+            GameObject _TNTFX = GameObject.Instantiate(TNTFX, instancePoint, Quaternion.identity);
+            Destroy(_TNTFX, 5f);
+
+
+            ApplyExplosionForce(instancePoint);
+
+            foreach (Vector3 point in tntPoints)
+            {
+                TNTServerRPC(point);
+                yield return new WaitForFixedUpdate();
+            }
+        }
+        else
+        {
+            TNT_Instances.Remove(instanceBody);
+            Destroy(instance);
+            GameObject _TNTFX = GameObject.Instantiate(TNTFX, instancePoint, Quaternion.identity);
+            Destroy(_TNTFX, 5f);
+            ApplyExplosionForce(instancePoint);
+        }
+    }
+
+    private void ApplyExplosionForce(Vector3 instancePoint)
+    {
+        foreach (Rigidbody tnt in TNT_Instances)
+        {
+            if (tnt != null)
+            {
+                Vector3 direction = (tnt.transform.position - instancePoint);
+                direction.y = 1;
+                tnt.AddExplosionForce(TNT_Radius * 2, instancePoint, TNT_Radius, 3.0f, ForceMode.Impulse);
+            }
+        }
+    }
+
+
+    async void RegnenerateTNTChunksServerRPCAsync(List<Vector3Int> chunks)
+    {
+        RegnenerateTNTChunksServerRPC(await SerializeChunksAsync(chunks));
+    }
+
+    [ServerRpc]
+    void RegnenerateTNTChunksServerRPC(byte[] chunksToRegenerate)
+    {
+        RegnenerateTNTChunksClientRPC(chunksToRegenerate);
+    }
+
+    [ClientRpc]
+    void RegnenerateTNTChunksClientRPC(byte[] chunksToRegenerateBytes)
+    {
+        RegnenerateTNTChunksClientAsync(chunksToRegenerateBytes);
+    }
+
+    async void RegnenerateTNTChunksClientAsync(byte[] chunksToRegenerateBytes)
+    {
+        List<Vector3Int> chunksToRegenerate = await DeserializeChunksAsync(chunksToRegenerateBytes);
+        if (ChunkManager.Instance != null)
+        {
+            foreach (Vector3Int chunk in chunksToRegenerate)
+            {
+                if (ChunkManager.Instance.activeChunks.ContainsKey(chunk))
+                {
+                    ChunkManager.Instance.activeChunks[chunk].GenerateMesh(true);
+                }
             }
         }
     }
@@ -382,7 +648,14 @@ public class BlockPlace : NetworkBehaviour
     [ClientRpc]
     void PlaceBlockClientRPC(Vector3 position, Vector3 normal, byte blockId, bool buffer, bool regenerate, ulong id)
     {
-        StartCoroutine(WaitForChunkManagerThenPlaceBlock(position, normal, blockId, buffer, regenerate, id));
+        if (NetworkManager.LocalClientId != id)
+        {
+            StartCoroutine(WaitForChunkManagerThenPlaceBlock(position, normal, blockId, buffer, regenerate, id));
+        }
+        if(buffer && IsHost)
+        {
+            BufferedBlockEvents.Add((position, normal, blockId));
+        }
     }
 
     private IEnumerator WaitForChunkManagerThenPlaceBlock(Vector3 position, Vector3 normal, byte blockId, bool buffer, bool regenerate, ulong id)
@@ -396,20 +669,19 @@ public class BlockPlace : NetworkBehaviour
         if (NetworkManager.LocalClientId != id)
         {
             ChunkManager.Instance.SetVoxelAtWorldPosition(position, normal, blockId, regenerate, true);
-            if (blockId != 0)
+            if (regenerate)
             {
-                GameObject SFX = GameObject.Instantiate(PlaceSFX, position, Quaternion.identity);
-                Destroy(SFX, 5f);
+                if (blockId != 0)
+                {
+                    GameObject SFX = GameObject.Instantiate(PlaceSFX, position, Quaternion.identity);
+                    Destroy(SFX, 5f);
+                }
+                else
+                {
+                    GameObject SFX = GameObject.Instantiate(BreakSFX, position, Quaternion.identity);
+                    Destroy(SFX, 5f);
+                }
             }
-            else
-            {
-                GameObject SFX = GameObject.Instantiate(BreakSFX, position, Quaternion.identity);
-                Destroy(SFX, 5f);
-            }
-        }
-        if (buffer && IsHost)
-        {
-            BufferedBlockEvents.Add((position, normal, blockId));
         }
     }
 

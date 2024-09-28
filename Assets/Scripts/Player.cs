@@ -23,6 +23,9 @@ using System.Text.RegularExpressions;
 public class Player : NetworkBehaviour
 {
     public VoiceChat VC;
+    public GameObject WalkFX;
+    private float WalkTime;
+    public float WalkTimeVal = .25f;
     public GameObject MicOn;
     public GameObject MicOff;
     public GameObject ChatPrefab;
@@ -39,7 +42,8 @@ public class Player : NetworkBehaviour
     public Animator Anim;
     public Transform Head;
     private CharacterController controller;
-    private Vector3 playerVelocity;
+    private Vector3 PlayerVelocity;
+    private Vector3 PrevVelocity;
     private bool groundedPlayer;
     public float playerSpeed = 2.0f;
     private float OriginalSpeed;
@@ -120,6 +124,12 @@ public class Player : NetworkBehaviour
     public NetworkVariable<bool> Moving = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     [HideInInspector]
     public NetworkVariable<bool> Crouch = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    [HideInInspector]
+    public NetworkVariable<bool> Fly = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    [HideInInspector]
+    public NetworkVariable<float> Speed = new NetworkVariable<float>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    [HideInInspector]
+    public NetworkVariable<bool> Grounded = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     private string TargetWorldName;
     private bool Teleporting = false;
 
@@ -182,8 +192,26 @@ public class Player : NetworkBehaviour
         controller.enabled = false;
     }
 
+
+
     private void FixedUpdate()
     {
+        if (Moving.Value && !Crouch.Value && Grounded.Value)
+        {
+            WalkTime += Time.deltaTime;
+            if (WalkTime >= WalkTimeVal / Mathf.Clamp((Speed.Value/ OriginalSpeed),1, Mathf.Infinity))
+            {
+                AudioSource WalkSound = GameObject.Instantiate(WalkFX, transform.position, Quaternion.identity).GetComponent<AudioSource>();
+                WalkSound.pitch = Mathf.Clamp(UnityEngine.Random.value, .5f, 1);
+                WalkTime = 0;
+            }
+        }
+        else
+        {
+            WalkTime = 0;
+        }
+
+
         if (IsOwner)
         {
             UpdatePlayerPositions();
@@ -670,6 +698,18 @@ public class Player : NetworkBehaviour
     }
 
 
+    [ServerRpc]
+    void SetTNTExplodeServerRPC(bool val)
+    {
+        SetTNTExplodeClientRPC(val);
+    }
+    [ClientRpc]
+    void SetTNTExplodeClientRPC(bool val)
+    {
+        GetLocal().chunkManager.TNT_Explodes = val;
+    }
+
+
     void Update()
     {
 
@@ -772,7 +812,7 @@ public class Player : NetworkBehaviour
                 if (ChatInput.text == "/help")
                 {
                     SendChatMessageLocal("<color=#00FFFF>/spawn, /tp {Username} | {x} {y} {z}, " +
-                        "/setSpawnPosition, /time set {Value}, /chunkborders </color>");
+                        "/setSpawnPosition, /tntExplodes, /time set {Value}, /chunkBorders </color>");
                 }
                 else if (ChatInput.text == "/spawn")
                 {
@@ -791,7 +831,7 @@ public class Player : NetworkBehaviour
                         if (p != null && usernameOrX != this.Username.Value)
                         {
                             Teleport(p.transform.position, 0, false);
-                            SendChatMessageLocal("<color=#00FFFF>Teleported to player " + usernameOrX + "</color>");
+                            SendChatMessageLocal("<color=#00FFFF>Teleported to User " + usernameOrX + "</color>");
                         }
                         else if (parts.Length == 4)
                         {
@@ -811,16 +851,16 @@ public class Player : NetworkBehaviour
 
                                 Vector3 targetPosition = new Vector3(x, y, z);
                                 Teleport(targetPosition, 0, false);
-                                SendChatMessageLocal("<color=#00FFFF>Teleported to coordinates (" + x + ", " + y + ", " + z + ")</color>");
+                                SendChatMessageLocal("<color=#00FFFF>Teleported to Coordinates (" + x + ", " + y + ", " + z + ")</color>");
                             }
                             else
                             {
-                                SendChatMessageLocal("<color=red>Invalid coordinates</color>");
+                                SendChatMessageLocal("<color=red>Invalid Coordinates</color>");
                             }
                         }
                         else
                         {
-                            SendChatMessageLocal("<color=red>Invalid user or coordinates</color>");
+                            SendChatMessageLocal("<color=red>Invalid User or Coordinates</color>");
                         }
                     }
                     else
@@ -834,11 +874,25 @@ public class Player : NetworkBehaviour
                     {
                         SetSpawnServerRPC(transform.position);
                         chunkManager.SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
-                        SendChatMessageLocal("<color=#00FFFF>Set Spawn position to (" + transform.position.x + ", " + transform.position.y + ", " + transform.position.z + ")</color>");
+                        SendChatMessageLocal("<color=#00FFFF>Set Spawn Position to (" + transform.position.x + ", " + transform.position.y + ", " + transform.position.z + ")</color>");
                     }
                     else
                     {
-                        SendChatMessageLocal("<color=red>You need to be the host</color>");
+                        SendChatMessageLocal("<color=red>You Need to be the Host</color>");
+                    }
+                }
+                else if (ChatInput.text == "/tntExplodes")
+                {
+                    if (IsHost)
+                    {
+                        bool TNT_ExplodeVal = !chunkManager.TNT_Explodes;
+                        SetTNTExplodeServerRPC(TNT_ExplodeVal);
+                        chunkManager.SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
+                        SendChatMessageLocal("<color=#00FFFF>Set TNT Explodes to " + TNT_ExplodeVal +"</color>");
+                    }
+                    else
+                    {
+                        SendChatMessageLocal("<color=red>You Need to be the Host</color>");
                     }
                 }
                 else if (ChatInput.text.StartsWith("/time set "))
@@ -848,17 +902,17 @@ public class Player : NetworkBehaviour
                     if (float.TryParse(timeString, out float timeValue))
                     {
                         SetTimeServerRPC(timeValue);
-                        SendChatMessageLocal("<color=#00FFFF>Time set to " + timeValue + "</color>");
+                        SendChatMessageLocal("<color=#00FFFF>Time Set to " + timeValue + "</color>");
                     }
                     else
                     {
-                        SendChatMessageLocal("<color=red>Invalid time value entered</color>");
+                        SendChatMessageLocal("<color=red>Invalid Time Value entered</color>");
                     }
                 }
-                else if (ChatInput.text == "/chunkborders")
+                else if (ChatInput.text == "/chunkBorders")
                 {
                     chunkborders = !chunkborders;
-                    SendChatMessageLocal("<color=#00FFFF>Set chunk borders to " + chunkborders + "</color>");
+                    SendChatMessageLocal("<color=#00FFFF>Set Chunk Borders to " + chunkborders + "</color>");
 
                     foreach (Camera cam in DebugCameras)
                     {
@@ -948,7 +1002,7 @@ public class Player : NetworkBehaviour
 
         if (AllowMovement == false)
         {
-            playerVelocity = Vector3.zero;
+            PlayerVelocity = Vector3.zero;
         }
 
         maxDeltaTime += Time.deltaTime;
@@ -964,22 +1018,32 @@ public class Player : NetworkBehaviour
         Anim.SetBool("Moving", Moving.Value);
         Anim.SetBool("Crouching", Crouch.Value);
         if (IsOwner == false) return;
-        float playerVelocityAmount = new Vector3(playerVelocity.x, 0, playerVelocity.z).magnitude;
+        float playerVelocityAmount = new Vector3(PlayerVelocity.x, 0, PlayerVelocity.z).magnitude;
         float MoveAmount = Mathf.Clamp01(Mathf.Abs(Mathf.RoundToInt(playerVelocityAmount)));
 
         if (MoveAmount == 1)
         {
             Moving.Value = true; 
-            MovementDotY = Mathf.Clamp((Vector3.Dot((transform.right), (playerVelocity))) * 5, -45, 45);
+            MovementDotY = Mathf.Clamp((Vector3.Dot((transform.right), (PlayerVelocity))) * 5, -45, 45);
         }
         else
         {
             Moving.Value = false;
         }
 
-        Hand.transform.localPosition = Vector3.Lerp(Hand.transform.localPosition, 
-            new Vector3(Mathf.Sin(Time.time * playerSpeed * HandAmountX * MoveAmount) * HandAmount, Mathf.Sin(Time.time * playerSpeed * HandAmountY * MoveAmount) * HandAmount, 0)
-            , 15 * Time.deltaTime);
+        Hand.transform.localPosition = Vector3.Lerp(
+            Hand.transform.localPosition,
+            new Vector3(
+                Mathf.Sin(Time.time * playerSpeed * HandAmountX * MoveAmount) * HandAmount,
+                Mathf.Sin(Time.time * playerSpeed * HandAmountY * MoveAmount) * HandAmount +
+                Mathf.Sin(Time.time * HandAmountY/2) * HandAmount/2,
+                0
+            ),
+            15 * Time.deltaTime
+        );
+
+
+
         Anim.transform.localRotation = Quaternion.Slerp(Anim.transform.localRotation, Quaternion.Euler(0, MovementDotY + 90, 0), 15 * Time.deltaTime);
         Head.transform.rotation = Quaternion.Euler(playerCamera.transform.eulerAngles.z, playerCamera.transform.eulerAngles.y + 90, playerCamera.transform.eulerAngles.x);
     }
@@ -1031,6 +1095,7 @@ public class Player : NetworkBehaviour
             1.1f - radius,
             ~ignore
         );
+        Grounded.Value = groundedPlayer;
 
 
         Vector3 move = (!IsPaused && !Chatting && !PickingBlock)
@@ -1042,33 +1107,44 @@ public class Player : NetworkBehaviour
         bool isNearLedge = Physics.Raycast(transform.position + forwardDirection, -Vector3.up, out LedgeHit, 1.1f, ~ignore);
 
         // Prevent player from falling through ground
-        if (groundedPlayer && playerVelocity.y < 0)
+        if (groundedPlayer && PlayerVelocity.y < 0)
         {
-            playerVelocity.y = 0f;
+            PlayerVelocity.y = 0f;
         }
 
 
-        // Apply different velocity logic for crouching
-        if (Crouching && groundedPlayer)
+        if (groundedPlayer || Flying)
         {
-            // Only allow movement if ledge is detected while crouching
-            if (isNearLedge)
+            if (Crouching && groundedPlayer)
             {
-                playerVelocity.x = move.x * playerSpeed;
-                playerVelocity.z = move.z * playerSpeed;
+                if (isNearLedge)
+                {
+                    PlayerVelocity.x = move.x * playerSpeed;
+                    PlayerVelocity.z = move.z * playerSpeed;
+                }
+                else
+                {
+                    PlayerVelocity.x = 0;
+                    PlayerVelocity.z = 0;
+                }
             }
             else
             {
-                playerVelocity.x = 0;
-                playerVelocity.z = 0;
+                PlayerVelocity.x = move.x * playerSpeed;
+                PlayerVelocity.z = move.z * playerSpeed;
             }
+
+            PrevVelocity = PlayerVelocity;
+            PrevVelocity.y = 0;
         }
         else
         {
-            // Normal movement when not crouching
-            playerVelocity.x = move.x * playerSpeed;
-            playerVelocity.z = move.z * playerSpeed;
+            PlayerVelocity = (move * (playerSpeed / 2))
+                             + (PrevVelocity * (1.25f - move.magnitude / 2))
+                             + Vector3.up * PlayerVelocity.y;
         }
+
+
 
         if (!IsPaused && !Chatting && !PickingBlock)
         {
@@ -1099,6 +1175,7 @@ public class Player : NetworkBehaviour
                     }
                 }
             }
+            Speed.Value = playerSpeed;
         }
         else
         {
@@ -1144,6 +1221,7 @@ public class Player : NetworkBehaviour
                     if (WaitingForDoublePress && (Time.time - LastSpacePressTime) < DoublePressTime)
                     {
                         Flying = true;
+                        Fly.Value = Flying;
                         WaitingForDoublePress = false;
                     }
                     else
@@ -1154,12 +1232,12 @@ public class Player : NetworkBehaviour
 
                     if (groundedPlayer)
                     {
-                        playerVelocity.y += Mathf.Sqrt(jumpHeight * -3.0f * gravityValue);
+                        PlayerVelocity.y += Mathf.Sqrt(jumpHeight * -3.0f * gravityValue);
                     }
                 }
             }
 
-            playerVelocity.y += CurrentGravity * Time.deltaTime;
+            PlayerVelocity.y += CurrentGravity * Time.deltaTime;
         }
         else
         {
@@ -1167,15 +1245,15 @@ public class Player : NetworkBehaviour
             {
                 if (Input.GetKey(KeyCode.Space))
                 {
-                    playerVelocity.y = playerSpeed;
+                    PlayerVelocity.y = playerSpeed;
                 }
                 else if (Input.GetKey(KeyCode.LeftShift))
                 {
-                    playerVelocity.y = -playerSpeed;
+                    PlayerVelocity.y = -playerSpeed;
                 }
                 else
                 {
-                    playerVelocity.y = 0;
+                    PlayerVelocity.y = 0;
                 }
 
                 if (Input.GetKeyDown(KeyCode.Space))
@@ -1183,6 +1261,7 @@ public class Player : NetworkBehaviour
                     if (WaitingForDoublePress && (Time.time - LastSpacePressTime) < DoublePressTime)
                     {
                         Flying = false;
+                        Fly.Value = Flying;
                         WaitingForDoublePress = false;
                     }
                     else
@@ -1194,11 +1273,11 @@ public class Player : NetworkBehaviour
             }
             else
             {
-                playerVelocity.y = 0;
+                PlayerVelocity.y = 0;
             }
         }
 
-        controller.Move(playerVelocity * Time.deltaTime);
+        controller.Move(PlayerVelocity * Time.deltaTime);
     }
 
 

@@ -96,7 +96,6 @@ public class BlockPlace : NetworkBehaviour
                 if (IsOwner)
                 {
                     GameObject BOption = GameObject.Instantiate(BlockOption, BlockContent);
-                    BOption.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = item.Key;
 
                     int newTexID = (byte)blockFaces[item.Value][0];
                     byte blockId = 0;
@@ -509,7 +508,7 @@ public class BlockPlace : NetworkBehaviour
         Vector3 instancePoint = instance.transform.position;
         float sqrTNTRadius = TNT_Radius * TNT_Radius;
 
-        if (IsOwner)
+        if (IsOwner && chunkManager.TNT_Explodes)
         {
             HashSet<Vector3Int> chunksToRegenerate = new HashSet<Vector3Int>();
             List<Vector3> tntPoints = new List<Vector3>();
@@ -564,23 +563,25 @@ public class BlockPlace : NetworkBehaviour
                 }
             }
 
-
-            yield return new WaitForSecondsRealtime(0.1f);
-            RegnenerateTNTChunksServerRPCAsync(chunksToRegenerate.ToList());
-
-            TNT_Instances.Remove(instanceBody);
-            Destroy(instance);
-
-            GameObject _TNTFX = GameObject.Instantiate(TNTFX, instancePoint, Quaternion.identity);
-            Destroy(_TNTFX, 5f);
-
-
-            ApplyExplosionForce(instancePoint);
-
-            foreach (Vector3 point in tntPoints)
+            if (chunkManager != null)
             {
-                TNTServerRPC(point);
-                yield return new WaitForFixedUpdate();
+                yield return new WaitForSeconds((chunkManager.CPUClock/1000)/2);
+                RegnenerateTNTChunksServerRPCAsync(chunksToRegenerate.ToList());
+
+                TNT_Instances.Remove(instanceBody);
+                Destroy(instance);
+
+                GameObject _TNTFX = GameObject.Instantiate(TNTFX, instancePoint, Quaternion.identity);
+                Destroy(_TNTFX, 5f);
+
+
+                ApplyExplosionForce(instancePoint);
+
+                foreach (Vector3 point in tntPoints)
+                {
+                    TNTServerRPC(point);
+                    yield return new WaitForSeconds((chunkManager.CPUClock / 1000) / 2);
+                }
             }
         }
         else

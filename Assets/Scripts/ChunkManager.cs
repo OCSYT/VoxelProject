@@ -135,15 +135,17 @@ public class ChunkManager : NetworkBehaviour
         public float GameTime;
         public List<ChunkData> Chunks;
         public List<PlayerData> Players;
+        public bool TNT_Explodes;
         private Dictionary<string, byte> BlockList;
 
         public SaveData() { }
 
-        public SaveData(int seed, float time, string worldtype, Vector3Int _SpawnPosition, Dictionary<Vector3Int, string[,,]> chunkCache, Dictionary<Vector3Int, byte[,,]> chunkCacheDir, List<PlayerData> players)
+        public SaveData(int seed, float time, string worldtype, Vector3Int _SpawnPosition, bool _TNT_Explodes, Dictionary<Vector3Int, string[,,]> chunkCache, Dictionary<Vector3Int, byte[,,]> chunkCacheDir, List<PlayerData> players)
         {
             SpawnPosition = new SerializableVector3Int(_SpawnPosition);
             Seed = seed;
             GameTime = time;
+            TNT_Explodes = _TNT_Explodes;
             WorldType = worldtype;
             Chunks = chunkCache.Select(kvp => new ChunkData(kvp.Key, kvp.Value, chunkCacheDir[kvp.Key])).ToList();
             Players = players;
@@ -202,7 +204,7 @@ public class ChunkManager : NetworkBehaviour
 
         Debug.Log(players.Count);
         // Create SaveData object
-        SaveData saveData = new SaveData(seed, GameTime, WorldType, Vector3Int.FloorToInt(SpawnPosition), chunkCache, chunkCacheDirection, players);
+        SaveData saveData = new SaveData(seed, GameTime, WorldType, Vector3Int.FloorToInt(SpawnPosition), TNT_Explodes, chunkCache, chunkCacheDirection, players);
 
 /*        // Serialize the SaveData object to JSON for debugging
         string saveDataJson = JsonConvert.SerializeObject(saveData, Formatting.Indented);
@@ -286,7 +288,6 @@ public class ChunkManager : NetworkBehaviour
         // Restore game state from SaveData object
         seed = saveData.Seed;
         WorldType = saveData.WorldType;
-
         if (local)
         {
             if (IsHost)
@@ -345,7 +346,7 @@ public class ChunkManager : NetworkBehaviour
             }
         }
         SpawnPosition = saveData.SpawnPosition.ToVector3Int();
-
+        TNT_Explodes = saveData.TNT_Explodes;
         Debug.Log("Game loaded successfully!");
     }
 
@@ -408,10 +409,12 @@ public class ChunkManager : NetworkBehaviour
     public int IgnoreLayer;
     private ConcurrentQueue<Vector3Int> chunksToCreate = new ConcurrentQueue<Vector3Int>();
     public Vector3 SpawnPosition;
+    public bool TNT_Explodes = false;
     [HideInInspector]
     public byte[] SaveDataBytes;
     public ShareFile ShareFile;
-    private float CPUClock;
+    [HideInInspector]
+    public float CPUClock;
     float GetCPUClockSpeed()
     {
         float clockSpeed = 0;
@@ -477,7 +480,6 @@ public class ChunkManager : NetworkBehaviour
 
         seed = PlayerPrefs.GetInt("Seed", System.Guid.NewGuid().GetHashCode());
         WorldType = PlayerPrefs.GetString("WorldType", "");
-
         previousTargetPosition = Camera.main.transform.position;
         previousTargetRotation = Mathf.Round(Camera.main.transform.rotation.eulerAngles.y);
 
@@ -494,6 +496,7 @@ public class ChunkManager : NetworkBehaviour
                 Player p = GameObject.FindObjectOfType<Player>();
                 p.Teleport(SpawnPos, 0, true);
                 SpawnPosition = SpawnPos;
+                TNT_Explodes = true;
                 SaveGame(Application.dataPath + "/../" + "Saves/" + PlayerPrefs.GetString("WorldName") + ".dat");
             }
             InvokeRepeating("SaveGameUpdate", 60 * 5, 60 * 5);
@@ -624,7 +627,7 @@ public class ChunkManager : NetworkBehaviour
 
             foreach (Vector3Int chunkPosition in sortedChunkPositions)
             {
-                await Task.Delay(Mathf.RoundToInt(CPUClock/3));
+                await Task.Delay(Mathf.RoundToInt(CPUClock/2));
                 if (cancelledGeneration)
                 {
                     cancelledGeneration = false;
@@ -667,7 +670,7 @@ public class ChunkManager : NetworkBehaviour
         float SkyValue = (GameTime) % 360;
         DirectionalLight.transform.rotation = Quaternion.Euler(SkyValue, 45, 0);
 
-        DirectionalLight.intensity = Mathf.Clamp((2 * Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up)), 0.01f, 2);
+        DirectionalLight.intensity = Mathf.Clamp((Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up)), 0.01f, 1);
         RenderSettings.ambientLight = AmbientColor * Mathf.Clamp(Vector3.Dot(DirectionalLight.transform.forward, -Vector3.up), MinimumAmbient, 1);
 
 
@@ -1081,7 +1084,14 @@ public class ChunkManager : NetworkBehaviour
                                 {
                                     if (voxelPosition.y < perlinRounded)
                                     {
-                                        voxelValue = BlockList["Dirt"]; //dirt
+                                        if (temp > 0.5)
+                                        {
+                                            voxelValue = BlockList["Sandstone"];
+                                        }
+                                        else
+                                        {
+                                            voxelValue = BlockList["Dirt"];
+                                        }
                                     }
                                     if (voxelPosition.y < perlinRounded - 4)
                                     {
@@ -1114,6 +1124,8 @@ public class ChunkManager : NetworkBehaviour
                     float temp = TemperatureMap(voxelPosition2D, scale, 4, .5f, 2) * height;
                     for (int y = 0; y < ChunkSize; y++)
                     {
+                        Vector3 VoxelPosition = chunkCornerWorldPos + new Vector3(x, y, z);
+                        float CaveNoise = Perlin3D(VoxelPosition.x, VoxelPosition.y, VoxelPosition.z, scale);
 
 
                         if (VoxelData[x, y, z] == BlockList["Stone"])

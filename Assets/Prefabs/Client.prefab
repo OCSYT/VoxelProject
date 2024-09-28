@@ -529,7 +529,7 @@ RectTransform:
   m_Father: {fileID: 3309426483250839568}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMax: {x: 0.99999994, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 20, y: 20}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -1028,7 +1028,7 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 7122724068079941063}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 0.00000011920929}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 20, y: 20}
@@ -1446,6 +1446,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   VC: {fileID: 879173354555118162}
+  WalkFX: {fileID: 6732557291295069348, guid: 2747d352aacc9004a855b7d7c9a2ce9d, type: 3}
+  WalkTimeVal: 0.5
   MicOn: {fileID: 1356087085130243234}
   MicOff: {fileID: 7911452735256190746}
   ChatPrefab: {fileID: 1387170343267192013, guid: 149f973513e85334a89ebdcef0717ff8,
@@ -5934,6 +5936,12 @@ MonoBehaviour:
     m_InternalValue: 0
   Crouch:
     m_InternalValue: 0
+  Fly:
+    m_InternalValue: 0
+  Speed:
+    m_InternalValue: 0
+  Grounded:
+    m_InternalValue: 0
   capeJsonUrl: https://raw.githubusercontent.com/OCSYT/VoxelProject/main/Capes.json
   Spawned: 0
 --- !u!114 &1095550317611875800
@@ -6343,7 +6351,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0.00000043312576, y: 2.486899e-14, z: 1, w: 0.0000000754979}
   m_LocalPosition: {x: -2.3210905e-16, y: -9.735346e-10, z: 0.0050000004}
-  m_LocalScale: {x: 1, y: 1.0000001, z: 1.0000001}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4830363723907523098}
@@ -7557,7 +7565,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0.0000006715444, y: 4.2632557e-14, z: 1, w: 0.0000000754979}
   m_LocalPosition: {x: 2.3210905e-16, y: 9.735354e-10, z: -0.005}
-  m_LocalScale: {x: 1, y: 1.0000001, z: 1.0000001}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5860880773374514992}
@@ -8546,7 +8554,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   InterpolationSpeed: 5
   MaxSnapDistance: 5
-  UseGlobalRotation: 0
+  UseGlobalRotation: 1
   SyncPosition: 0
   SyncRotation: 1
   SyncScale: 0
@@ -10474,7 +10482,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 8652539333430664956}
   m_Direction: 0
   m_Value: 0
-  m_Size: 1
+  m_Size: 0.99999994
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -12401,6 +12409,19 @@ MonoBehaviour:
     NoCollision: 0
     NoPlayerCollision: 0
     Light: {r: 0, g: 0, b: 0, a: 1}
+  - Name: Sandstone
+    Value: 45
+    Destructable: 1
+    FrontFace: 5
+    BackFace: 5
+    LeftFace: 5
+    RightFace: 5
+    TopFace: 5
+    BottomFace: 5
+    Transparent: 0
+    NoCollision: 0
+    NoPlayerCollision: 0
+    Light: {r: 0, g: 0, b: 0, a: 1}
   - Name: Mossy Cobblestone
     Value: 45
     Destructable: 1
@@ -13175,8 +13196,8 @@ MonoBehaviour:
     BackFace: 26
     LeftFace: 26
     RightFace: 26
-    TopFace: 40
-    BottomFace: 40
+    TopFace: 13
+    BottomFace: 13
     Transparent: 1
     NoCollision: 1
     NoPlayerCollision: 1
@@ -13188,8 +13209,8 @@ MonoBehaviour:
     BackFace: 41
     LeftFace: 41
     RightFace: 41
-    TopFace: 40
-    BottomFace: 40
+    TopFace: 13
+    BottomFace: 13
     Transparent: 1
     NoCollision: 1
     NoPlayerCollision: 1
@@ -13213,8 +13234,10 @@ MonoBehaviour:
   MinimumAmbient: 0.5
   IgnoreLayer: 2
   SpawnPosition: {x: 0, y: 0, z: 0}
+  TNT_Explodes: 0
   SaveDataBytes: 
   ShareFile: {fileID: 9130220636842330622}
+  CPUClock: 0
   waterLevel: 10
   height: 250
   scale: 0.001
@@ -13660,8 +13683,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 698247562025703875}
-  - component: {fileID: 8440839604454675199}
-  - component: {fileID: 3354841124732472731}
+  - component: {fileID: 6924719053395470346}
   m_Layer: 6
   m_Name: Content
   m_TagString: Untagged
@@ -13683,12 +13705,12 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 3128758656609689372}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 0.00024414062, y: 0.000091552734}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0.000029087067, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 1}
---- !u!114 &8440839604454675199
+--- !u!114 &6924719053395470346
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -13697,37 +13719,21 @@ MonoBehaviour:
   m_GameObject: {fileID: 6036108826700977504}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3245ec927659c4140ac4f8d17403cc18, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_HorizontalFit: 1
-  m_VerticalFit: 1
---- !u!114 &3354841124732472731
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6036108826700977504}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 59f8146938fff824cb5fd77236b75775, type: 3}
+  m_Script: {fileID: 11500000, guid: 8a8695521f0d02e499659fee002a26c2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_Padding:
-    m_Left: 0
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
+    m_Left: 25
+    m_Right: 25
+    m_Top: 25
+    m_Bottom: 25
   m_ChildAlignment: 0
-  m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
+  m_StartCorner: 0
+  m_StartAxis: 0
+  m_CellSize: {x: 100, y: 100}
+  m_Spacing: {x: 25, y: 25}
+  m_Constraint: 0
+  m_ConstraintCount: 2
 --- !u!1 &6049228380658698715
 GameObject:
   m_ObjectHideFlags: 0
@@ -14311,8 +14317,8 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 4569133935984104816}
   m_HandleRect: {fileID: 4356731085392249874}
   m_Direction: 2
-  m_Value: 0
-  m_Size: 1
+  m_Value: 1
+  m_Size: 0.9999999
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -17725,12 +17731,12 @@ Light:
   m_InnerSpotAngle: 21.80208
   m_CookieSize: 10
   m_Shadows:
-    m_Type: 1
+    m_Type: 0
     m_Resolution: -1
     m_CustomResolution: -1
     m_Strength: 1
     m_Bias: 0.05
-    m_NormalBias: 0.1
+    m_NormalBias: 0.4
     m_NearPlane: 0.2
     m_CullingMatrixOverride:
       e00: 1
@@ -17753,7 +17759,7 @@ Light:
   m_Cookie: {fileID: 0}
   m_DrawHalo: 0
   m_Flare: {fileID: 0}
-  m_RenderMode: 1
+  m_RenderMode: 0
   m_CullingMask:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -17761,7 +17767,7 @@ Light:
   m_Lightmapping: 4
   m_LightShadowCasterMode: 0
   m_AreaSize: {x: 1, y: 1}
-  m_BounceIntensity: 0
+  m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
   m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
@@ -17782,7 +17788,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Version: 3
-  m_UsePipelineSettings: 0
+  m_UsePipelineSettings: 1
   m_AdditionalLightsShadowResolutionTier: 2
   m_LightLayerMask: 1
   m_RenderingLayers: 1

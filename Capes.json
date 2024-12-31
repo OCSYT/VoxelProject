@@ -1,12 +1,16 @@
 {
     "users": [
       {
-        "steamname": "BracketProto",
+        "steamname": "Bracket",
         "cape": "Developer"
       },
       {
         "steamname": "bracketproto",
         "cape": "Developer"
+      },
+      {
+        "steamname": "VerveIsBad",
+        "cape": "Playtester"
       },
       {
         "steamname": "Nebula",
